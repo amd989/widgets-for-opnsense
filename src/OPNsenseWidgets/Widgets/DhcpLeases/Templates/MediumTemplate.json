@@ -1,11 +1,11 @@
 {
-  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "$schema": "https://adaptivecards.io/schemas/adaptive-card.json",
   "type": "AdaptiveCard",
-  "version": "1.5",
+  "version": "1.6",
   "body": [
     {
       "type": "ColumnSet",
-      "spacing": "none",
+      "spacing": "None",
       "columns": [
         {
           "type": "Column",
@@ -14,22 +14,22 @@
             {
               "type": "TextBlock",
               "text": "${totalLeases} devices",
-              "weight": "bolder",
-              "spacing": "none"
+              "weight": "Bolder",
+              "spacing": "None"
             }
           ]
         },
         {
           "type": "Column",
           "width": "auto",
-          "verticalContentAlignment": "center",
+          "verticalContentAlignment": "Center",
           "items": [
             {
               "type": "TextBlock",
               "text": "${lastRefresh}",
-              "size": "small",
+              "size": "Small",
               "isSubtle": true,
-              "spacing": "none"
+              "spacing": "None"
             }
           ]
         }
@@ -37,7 +37,7 @@
     },
     {
       "type": "ColumnSet",
-      "spacing": "none",
+      "spacing": "None",
       "columns": [
         {
           "type": "Column",
@@ -47,9 +47,9 @@
             {
               "type": "TextBlock",
               "text": "● ${newCount} new",
-              "size": "small",
-              "color": "accent",
-              "spacing": "none"
+              "size": "Small",
+              "color": "Accent",
+              "spacing": "None"
             }
           ]
         },
@@ -60,9 +60,9 @@
             {
               "type": "TextBlock",
               "text": "● ${activeCount} active",
-              "size": "small",
-              "color": "good",
-              "spacing": "none"
+              "size": "Small",
+              "color": "Good",
+              "spacing": "None"
             }
           ]
         }
@@ -71,13 +71,13 @@
     {
       "type": "Image",
       "url": "${sparkline}",
-      "size": "stretch",
+      "size": "Stretch",
       "height": "24px",
-      "spacing": "small"
+      "spacing": "Small"
     },
     {
       "type": "ColumnSet",
-      "spacing": "none",
+      "spacing": "None",
       "columns": [
         {
           "type": "Column",
@@ -86,9 +86,9 @@
             {
               "type": "TextBlock",
               "text": "24h",
-              "size": "small",
+              "size": "Small",
               "isSubtle": true,
-              "spacing": "none"
+              "spacing": "None"
             }
           ]
         },
@@ -99,9 +99,9 @@
             {
               "type": "TextBlock",
               "text": "now",
-              "size": "small",
+              "size": "Small",
               "isSubtle": true,
-              "spacing": "none"
+              "spacing": "None"
             }
           ]
         }
@@ -109,7 +109,7 @@
     },
     {
       "type": "ColumnSet",
-      "spacing": "small",
+      "spacing": "Small",
       "columns": [
         {
           "type": "Column",
@@ -118,12 +118,12 @@
             {
               "type": "Container",
               "$data": "${col1}",
-              "separator": true,
-              "spacing": "small",
+              "style": "${style}",
+              "spacing": "Small",
               "items": [
                 {
                   "type": "ColumnSet",
-                  "spacing": "none",
+                  "spacing": "None",
                   "columns": [
                     {
                       "type": "Column",
@@ -132,10 +132,9 @@
                         {
                           "type": "TextBlock",
                           "text": "${hostname}",
-                          "size": "small",
-                          "weight": "bolder",
-                          "wrap": false,
-                          "spacing": "none"
+                          "size": "Small",
+                          "weight": "Bolder",
+                          "spacing": "None"
                         }
                       ]
                     },
@@ -146,9 +145,9 @@
                         {
                           "type": "TextBlock",
                           "text": "${time}",
-                          "size": "small",
+                          "size": "Small",
                           "isSubtle": true,
-                          "spacing": "none"
+                          "spacing": "None"
                         }
                       ]
                     }
@@ -157,12 +156,14 @@
                 {
                   "type": "TextBlock",
                   "text": "${meta}",
-                  "size": "small",
+                  "size": "Small",
                   "isSubtle": true,
-                  "spacing": "none",
+                  "spacing": "None",
                   "$when": "${meta != ''}"
                 }
-              ]
+              ],
+              "showBorder": true,
+              "roundedCorners": true
             }
           ]
         },
@@ -173,12 +174,12 @@
             {
               "type": "Container",
               "$data": "${col2}",
-              "separator": true,
-              "spacing": "small",
+              "style": "${style}",
+              "spacing": "Small",
               "items": [
                 {
                   "type": "ColumnSet",
-                  "spacing": "none",
+                  "spacing": "None",
                   "columns": [
                     {
                       "type": "Column",
@@ -187,10 +188,9 @@
                         {
                           "type": "TextBlock",
                           "text": "${hostname}",
-                          "size": "small",
-                          "weight": "bolder",
-                          "wrap": false,
-                          "spacing": "none"
+                          "size": "Small",
+                          "weight": "Bolder",
+                          "spacing": "None"
                         }
                       ]
                     },
@@ -201,9 +201,9 @@
                         {
                           "type": "TextBlock",
                           "text": "${time}",
-                          "size": "small",
+                          "size": "Small",
                           "isSubtle": true,
-                          "spacing": "none"
+                          "spacing": "None"
                         }
                       ]
                     }
@@ -212,12 +212,14 @@
                 {
                   "type": "TextBlock",
                   "text": "${meta}",
-                  "size": "small",
+                  "size": "Small",
                   "isSubtle": true,
-                  "spacing": "none",
+                  "spacing": "None",
                   "$when": "${meta != ''}"
                 }
-              ]
+              ],
+              "roundedCorners": true,
+              "showBorder": true
             }
           ]
         }
@@ -226,9 +228,9 @@
     {
       "type": "TextBlock",
       "text": "${displayedLeases} of ${totalLeases}",
-      "size": "small",
+      "size": "Small",
       "isSubtle": true,
-      "spacing": "small",
+      "spacing": "Small",
       "$when": "${totalLeases > 0}"
     }
   ]

@@ -1,11 +1,11 @@
 {
-  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "$schema": "https://adaptivecards.io/schemas/adaptive-card.json",
   "type": "AdaptiveCard",
-  "version": "1.5",
+  "version": "1.6",
   "body": [
     {
       "type": "ColumnSet",
-      "spacing": "none",
+      "spacing": "None",
       "columns": [
         {
           "type": "Column",
@@ -14,9 +14,9 @@
             {
               "type": "TextBlock",
               "text": "${totalLeases} devices",
-              "size": "small",
-              "weight": "bolder",
-              "spacing": "none"
+              "size": "Small",
+              "weight": "Bolder",
+              "spacing": "None"
             }
           ]
         },
@@ -28,9 +28,9 @@
             {
               "type": "TextBlock",
               "text": "● ${newCount} new",
-              "size": "small",
-              "color": "accent",
-              "spacing": "none"
+              "size": "Small",
+              "color": "Accent",
+              "spacing": "None"
             }
           ]
         }
@@ -39,12 +39,12 @@
     {
       "type": "Container",
       "$data": "${leases}",
-      "separator": true,
-      "spacing": "small",
+      "style": "${style}",
+      "spacing": "Small",
       "items": [
         {
           "type": "ColumnSet",
-          "spacing": "none",
+          "spacing": "None",
           "columns": [
             {
               "type": "Column",
@@ -53,10 +53,9 @@
                 {
                   "type": "TextBlock",
                   "text": "${hostname}",
-                  "size": "small",
-                  "weight": "bolder",
-                  "wrap": false,
-                  "spacing": "none"
+                  "size": "Small",
+                  "weight": "Bolder",
+                  "spacing": "None"
                 }
               ]
             },
@@ -67,9 +66,9 @@
                 {
                   "type": "TextBlock",
                   "text": "${time}",
-                  "size": "small",
+                  "size": "Small",
                   "isSubtle": true,
-                  "spacing": "none"
+                  "spacing": "None"
                 }
               ]
             }
@@ -78,19 +77,21 @@
         {
           "type": "TextBlock",
           "text": "${meta}",
-          "size": "small",
+          "size": "Small",
           "isSubtle": true,
-          "spacing": "none",
+          "spacing": "None",
           "$when": "${meta != ''}"
         }
-      ]
+      ],
+      "showBorder": true,
+      "roundedCorners": true
     },
     {
       "type": "TextBlock",
       "text": "No devices found",
-      "size": "small",
+      "size": "Small",
       "isSubtle": true,
-      "spacing": "medium",
+      "spacing": "Medium",
       "$when": "${totalLeases == 0}"
     }
   ]

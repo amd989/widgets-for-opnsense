@@ -72,6 +72,13 @@ public sealed class DhcpLeasesWidget : IWidgetDefinition
                 meta = string.Join(" \u00b7 ", metaParts),
                 time = FormatRelativeTime(l.EffectiveLeaseStart, now),
                 status,
+                style = status switch
+                {
+                    "new" => "accent",
+                    "active" => "good",
+                    "reserved" => "warning",
+                    _ => "emphasis"
+                },
                 isNew = status == "new",
                 isReserved = l.IsReserved == "1"
             };
