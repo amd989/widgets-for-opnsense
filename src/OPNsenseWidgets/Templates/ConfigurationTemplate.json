@@ -1,0 +1,154 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "TextBlock",
+      "text": "Configure OPNsense",
+      "weight": "bolder",
+      "size": "medium",
+      "spacing": "none"
+    },
+    {
+      "type": "ColumnSet",
+      "spacing": "small",
+      "columns": [
+        {
+          "type": "Column",
+          "width": "60px",
+          "verticalContentAlignment": "center",
+          "items": [{ "type": "TextBlock", "text": "URL", "spacing": "none" }]
+        },
+        {
+          "type": "Column",
+          "width": "stretch",
+          "items": [
+            {
+              "type": "Input.Text",
+              "id": "hostUrl",
+              "placeholder": "https://192.168.1.1",
+              "value": "${hostUrl}",
+              "spacing": "none"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "ColumnSet",
+      "spacing": "small",
+      "columns": [
+        {
+          "type": "Column",
+          "width": "60px",
+          "verticalContentAlignment": "center",
+          "items": [{ "type": "TextBlock", "text": "Key", "spacing": "none" }]
+        },
+        {
+          "type": "Column",
+          "width": "stretch",
+          "items": [
+            {
+              "type": "Input.Text",
+              "id": "apiKey",
+              "placeholder": "API key",
+              "value": "${apiKey}",
+              "spacing": "none"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "ColumnSet",
+      "spacing": "small",
+      "columns": [
+        {
+          "type": "Column",
+          "width": "60px",
+          "verticalContentAlignment": "center",
+          "items": [{ "type": "TextBlock", "text": "Secret", "spacing": "none" }]
+        },
+        {
+          "type": "Column",
+          "width": "stretch",
+          "items": [
+            {
+              "type": "Input.Text",
+              "id": "apiSecret",
+              "placeholder": "API secret",
+              "value": "${apiSecret}",
+              "spacing": "none",
+              "style": "password"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "ColumnSet",
+      "spacing": "small",
+      "columns": [
+        {
+          "type": "Column",
+          "width": "stretch",
+          "items": [
+            {
+              "type": "Input.Toggle",
+              "id": "allowSelfSigned",
+              "title": "Self-signed certs",
+              "value": "${allowSelfSigned}",
+              "valueOn": "true",
+              "valueOff": "false",
+              "spacing": "none"
+            }
+          ]
+        },
+        {
+          "type": "Column",
+          "width": "80px",
+          "items": [
+            {
+              "type": "Input.Number",
+              "id": "refreshInterval",
+              "placeholder": "30",
+              "min": 10,
+              "max": 300,
+              "value": "${refreshInterval}",
+              "spacing": "none",
+              "label": "Interval"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "TextBlock",
+      "text": "${testResult}",
+      "spacing": "small",
+      "isVisible": "${hasTestResult}",
+      "wrap": true,
+      "color": "attention",
+      "size": "small"
+    }
+  ],
+  "actions": [
+    {
+      "type": "Action.Execute",
+      "title": "Save",
+      "verb": "saveConfig",
+      "style": "positive"
+    },
+    {
+      "type": "Action.Execute",
+      "title": "Test",
+      "verb": "testConnection"
+    },
+    {
+      "type": "Action.Execute",
+      "title": "Import Key",
+      "verb": "importKeyFile"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "TextBlock",
+      "text": "OPNsense Widget",
+      "weight": "bolder",
+      "size": "medium"
+    },
+    {
+      "type": "TextBlock",
+      "text": "Welcome! Click the **...** menu above and select **Customize** to configure your OPNsense connection.",
+      "wrap": true,
+      "size": "small",
+      "spacing": "small"
+    },
+    {
+      "type": "TextBlock",
+      "text": "You'll need your OPNsense host URL and an API key/secret pair.",
+      "wrap": true,
+      "size": "small",
+      "isSubtle": true,
+      "spacing": "small"
+    }
+  ]
+}

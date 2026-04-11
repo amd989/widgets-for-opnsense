@@ -1,0 +1,28 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "TextBlock",
+      "text": "Connection Error",
+      "weight": "bolder",
+      "size": "medium",
+      "color": "attention"
+    },
+    {
+      "type": "TextBlock",
+      "text": "${errorMessage}",
+      "wrap": true,
+      "size": "small",
+      "spacing": "small"
+    }
+  ],
+  "actions": [
+    {
+      "type": "Action.Execute",
+      "title": "Retry",
+      "verb": "refresh"
+    }
+  ]
+}

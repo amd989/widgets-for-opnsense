@@ -1,0 +1,235 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "ColumnSet",
+      "spacing": "none",
+      "columns": [
+        {
+          "type": "Column",
+          "width": "stretch",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "${totalLeases} devices",
+              "weight": "bolder",
+              "spacing": "none"
+            }
+          ]
+        },
+        {
+          "type": "Column",
+          "width": "auto",
+          "verticalContentAlignment": "center",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "${lastRefresh}",
+              "size": "small",
+              "isSubtle": true,
+              "spacing": "none"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "ColumnSet",
+      "spacing": "none",
+      "columns": [
+        {
+          "type": "Column",
+          "width": "auto",
+          "$when": "${newCount > 0}",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "● ${newCount} new",
+              "size": "small",
+              "color": "accent",
+              "spacing": "none"
+            }
+          ]
+        },
+        {
+          "type": "Column",
+          "width": "auto",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "● ${activeCount} active",
+              "size": "small",
+              "color": "good",
+              "spacing": "none"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Image",
+      "url": "${sparkline}",
+      "size": "stretch",
+      "height": "24px",
+      "spacing": "small"
+    },
+    {
+      "type": "ColumnSet",
+      "spacing": "none",
+      "columns": [
+        {
+          "type": "Column",
+          "width": "stretch",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "24h",
+              "size": "small",
+              "isSubtle": true,
+              "spacing": "none"
+            }
+          ]
+        },
+        {
+          "type": "Column",
+          "width": "auto",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "now",
+              "size": "small",
+              "isSubtle": true,
+              "spacing": "none"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "ColumnSet",
+      "spacing": "small",
+      "columns": [
+        {
+          "type": "Column",
+          "width": "stretch",
+          "items": [
+            {
+              "type": "Container",
+              "$data": "${col1}",
+              "separator": true,
+              "spacing": "small",
+              "items": [
+                {
+                  "type": "ColumnSet",
+                  "spacing": "none",
+                  "columns": [
+                    {
+                      "type": "Column",
+                      "width": "stretch",
+                      "items": [
+                        {
+                          "type": "TextBlock",
+                          "text": "${hostname}",
+                          "size": "small",
+                          "weight": "bolder",
+                          "wrap": false,
+                          "spacing": "none"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "Column",
+                      "width": "auto",
+                      "items": [
+                        {
+                          "type": "TextBlock",
+                          "text": "${time}",
+                          "size": "small",
+                          "isSubtle": true,
+                          "spacing": "none"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "${meta}",
+                  "size": "small",
+                  "isSubtle": true,
+                  "spacing": "none",
+                  "$when": "${meta != ''}"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "Column",
+          "width": "stretch",
+          "items": [
+            {
+              "type": "Container",
+              "$data": "${col2}",
+              "separator": true,
+              "spacing": "small",
+              "items": [
+                {
+                  "type": "ColumnSet",
+                  "spacing": "none",
+                  "columns": [
+                    {
+                      "type": "Column",
+                      "width": "stretch",
+                      "items": [
+                        {
+                          "type": "TextBlock",
+                          "text": "${hostname}",
+                          "size": "small",
+                          "weight": "bolder",
+                          "wrap": false,
+                          "spacing": "none"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "Column",
+                      "width": "auto",
+                      "items": [
+                        {
+                          "type": "TextBlock",
+                          "text": "${time}",
+                          "size": "small",
+                          "isSubtle": true,
+                          "spacing": "none"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "${meta}",
+                  "size": "small",
+                  "isSubtle": true,
+                  "spacing": "none",
+                  "$when": "${meta != ''}"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "TextBlock",
+      "text": "${displayedLeases} of ${totalLeases}",
+      "size": "small",
+      "isSubtle": true,
+      "spacing": "small",
+      "$when": "${totalLeases > 0}"
+    }
+  ]
+}

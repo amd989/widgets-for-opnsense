@@ -1,0 +1,17 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="ARM64" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Folder Name="/src/">
+    <Project Path="src/OPNsenseWidgets.Package/OPNsenseWidgets.Package.wapproj" Type="c7167f0d-bc9f-4e6e-afe1-012c56b48db5" Id="a1b2c3d4-e5f6-7890-abcd-ef1234567890">
+      <Platform Solution="*|Any CPU" Project="x64" />
+      <Deploy />
+    </Project>
+    <Project Path="src/OPNsenseWidgets/OPNsenseWidgets.csproj">
+      <Platform Solution="*|ARM64" Project="ARM64" />
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+  </Folder>
+</Solution>

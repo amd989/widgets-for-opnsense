@@ -1,0 +1,97 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "ColumnSet",
+      "spacing": "none",
+      "columns": [
+        {
+          "type": "Column",
+          "width": "stretch",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "${totalLeases} devices",
+              "size": "small",
+              "weight": "bolder",
+              "spacing": "none"
+            }
+          ]
+        },
+        {
+          "type": "Column",
+          "width": "auto",
+          "$when": "${newCount > 0}",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "● ${newCount} new",
+              "size": "small",
+              "color": "accent",
+              "spacing": "none"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Container",
+      "$data": "${leases}",
+      "separator": true,
+      "spacing": "small",
+      "items": [
+        {
+          "type": "ColumnSet",
+          "spacing": "none",
+          "columns": [
+            {
+              "type": "Column",
+              "width": "stretch",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "${hostname}",
+                  "size": "small",
+                  "weight": "bolder",
+                  "wrap": false,
+                  "spacing": "none"
+                }
+              ]
+            },
+            {
+              "type": "Column",
+              "width": "auto",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "${time}",
+                  "size": "small",
+                  "isSubtle": true,
+                  "spacing": "none"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "TextBlock",
+          "text": "${meta}",
+          "size": "small",
+          "isSubtle": true,
+          "spacing": "none",
+          "$when": "${meta != ''}"
+        }
+      ]
+    },
+    {
+      "type": "TextBlock",
+      "text": "No devices found",
+      "size": "small",
+      "isSubtle": true,
+      "spacing": "medium",
+      "$when": "${totalLeases == 0}"
+    }
+  ]
+}

@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+  IgnorableNamespaces="uap uap3 rescap com">
+
+  <Identity
+    Name="OPNsenseWidgets"
+    Publisher="CN=OPNsenseWidgets"
+    Version="1.0.0.0" />
+
+  <mp:PhoneIdentity PhoneProductId="d40b2e99-b044-4758-9ab5-212c01b368ee"
+                    PhonePublisherId="00000000-0000-0000-0000-000000000000" />
+
+  <Properties>
+    <DisplayName>OPNsense Widgets</DisplayName>
+    <PublisherDisplayName>OPNsense Widgets</PublisherDisplayName>
+    <Logo>Images\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="x-generate" />
+  </Resources>
+
+  <Applications>
+    <Application Id="App"
+      Executable="OPNsenseWidgets\OPNsenseWidgets.exe"
+      EntryPoint="Windows.FullTrustApplication">
+
+      <uap:VisualElements
+        DisplayName="OPNsense Widgets"
+        Description="Monitor your OPNsense router from the Windows Widget Board"
+        BackgroundColor="transparent"
+        Square150x150Logo="Images\Square150x150Logo.png"
+        Square44x44Logo="Images\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Images\Wide310x150Logo.png" />
+      </uap:VisualElements>
+
+      <Extensions>
+        <!-- COM Server registration for widget provider -->
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:ExeServer Executable="OPNsenseWidgets\OPNsenseWidgets.exe"
+                           Arguments="-RegisterProcessAsComServer"
+                           DisplayName="OPNsense Widgets Provider">
+              <com:Class Id="D40B2E99-B044-4758-9AB5-212C01B368EE"
+                         DisplayName="OPNsenseWidgetProvider" />
+            </com:ExeServer>
+          </com:ComServer>
+        </com:Extension>
+
+        <!-- Widget provider extension -->
+        <uap3:Extension Category="windows.appExtension">
+          <uap3:AppExtension Name="com.microsoft.windows.widgets"
+                             DisplayName="OPNsense Widgets"
+                             Id="OPNsenseWidgets"
+                             PublicFolder="Public">
+            <uap3:Properties>
+              <WidgetProvider>
+                <ProviderIcons>
+                  <Icon Path="ProviderAssets\ProviderIcon.png" />
+                </ProviderIcons>
+                <Activation>
+                  <CreateInstance ClassId="D40B2E99-B044-4758-9AB5-212C01B368EE" />
+                </Activation>
+
+                <Definitions>
+                  <!-- DHCP Leases Widget -->
+                  <Definition Id="DhcpLeases_Widget"
+                              DisplayName="DHCP Leases"
+                              Description="Shows active DHCP leases from your OPNsense router, sorted by most recently connected"
+                              IsCustomizable="true"
+                              AllowMultiple="false">
+                    <Capabilities>
+                      <Capability>
+                        <Size Name="small" />
+                      </Capability>
+                      <Capability>
+                        <Size Name="medium" />
+                      </Capability>
+                      <Capability>
+                        <Size Name="large" />
+                      </Capability>
+                    </Capabilities>
+                    <ThemeResources>
+                      <Icons>
+                        <Icon Path="ProviderAssets\DhcpLeases_Icon.png" />
+                      </Icons>
+                      <Screenshots>
+                        <Screenshot Path="ProviderAssets\DhcpLeases_Screenshot.png"
+                                    DisplayAltText="DHCP lease list showing connected devices" />
+                      </Screenshots>
+                      <DarkMode>
+                        <Icons>
+                          <Icon Path="ProviderAssets\DhcpLeases_Icon.png" />
+                        </Icons>
+                      </DarkMode>
+                    </ThemeResources>
+                  </Definition>
+
+                  <!-- Future widget definitions go here -->
+                </Definitions>
+
+              </WidgetProvider>
+            </uap3:Properties>
+          </uap3:AppExtension>
+        </uap3:Extension>
+      </Extensions>
+
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <Capability Name="internetClient" />
+    <Capability Name="privateNetworkClientServer" />
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+</Package>
