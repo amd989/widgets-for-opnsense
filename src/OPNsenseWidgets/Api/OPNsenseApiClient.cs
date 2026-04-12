@@ -117,6 +117,88 @@ public sealed class OPNsenseApiClient : IDisposable
             lastException);
     }
 
+    public async Task<Dictionary<string, InterfaceStats>> GetInterfaceStatisticsAsync(
+        CancellationToken ct = default)
+    {
+        var url = $"{_baseUrl}/api/diagnostics/interface/getInterfaceStatistics";
+
+        try
+        {
+            var response = await _httpClient.GetAsync(url, ct);
+
+            if (response.StatusCode == HttpStatusCode.Unauthorized ||
+                response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                throw new OPNsenseAuthException(
+                    "Authentication failed. Check your API key and secret.");
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync(ct);
+            Provider.OPNsenseWidgetProvider.Log(
+                $"GetInterfaceStatisticsAsync: bodyLength={json.Length}");
+
+            using var doc = JsonDocument.Parse(json);
+            var result = new Dictionary<string, InterfaceStats>();
+
+            if (doc.RootElement.TryGetProperty("statistics", out var stats))
+            {
+                foreach (var iface in stats.EnumerateObject())
+                {
+                    var obj = iface.Value;
+                    result[iface.Name] = new InterfaceStats
+                    {
+                        DeviceName = iface.Name,
+                        Name = GetJsonString(obj, "name"),
+                        BytesReceived = GetJsonLong(obj, "bytes received"),
+                        BytesTransmitted = GetJsonLong(obj, "bytes transmitted"),
+                        PacketsReceived = GetJsonLong(obj, "input packets"),
+                        PacketsTransmitted = GetJsonLong(obj, "output packets")
+                    };
+                }
+            }
+
+            return result;
+        }
+        catch (OPNsenseAuthException) { throw; }
+        catch (HttpRequestException ex) when (
+            ex.InnerException is System.Security.Authentication.AuthenticationException)
+        {
+            throw new OPNsenseCertificateException(
+                "SSL certificate error. Enable 'Allow self-signed certificates' in settings.", ex);
+        }
+        catch (HttpRequestException ex) when (
+            ex.InnerException is System.Net.Sockets.SocketException)
+        {
+            throw new OPNsenseConnectionException(
+                $"Cannot reach {_baseUrl}. Check the URL and ensure OPNsense is running.", ex);
+        }
+        catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            throw new OPNsenseConnectionException(
+                "Request timed out. OPNsense may be busy or unreachable.", ex);
+        }
+    }
+
+    private static string GetJsonString(JsonElement obj, string property)
+    {
+        if (obj.TryGetProperty(property, out var val))
+            return val.ValueKind == JsonValueKind.String ? val.GetString() ?? "" : val.ToString();
+        return "";
+    }
+
+    private static long GetJsonLong(JsonElement obj, string property)
+    {
+        if (!obj.TryGetProperty(property, out var val)) return 0;
+        return val.ValueKind switch
+        {
+            JsonValueKind.Number => val.GetInt64(),
+            JsonValueKind.String when long.TryParse(val.GetString(), out var n) => n,
+            _ => 0
+        };
+    }
+
     public void Dispose() => _httpClient.Dispose();
 }
 

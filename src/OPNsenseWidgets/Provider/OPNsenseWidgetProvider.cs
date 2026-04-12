@@ -5,6 +5,7 @@ using OPNsenseWidgets.Api;
 using OPNsenseWidgets.Configuration;
 using OPNsenseWidgets.Widgets;
 using OPNsenseWidgets.Widgets.DhcpLeases;
+using OPNsenseWidgets.Widgets.Traffic;
 
 namespace OPNsenseWidgets.Provider;
 
@@ -25,6 +26,7 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
     {
         Log("Provider constructed");
         RegisterDefinition(new DhcpLeasesWidget());
+        RegisterDefinition(new TrafficWidget());
     }
 
     internal static void Log(string message)

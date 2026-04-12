@@ -1,0 +1,70 @@
+{
+  "$schema": "https://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.6",
+  "body": [
+    {
+      "type": "TextBlock",
+      "text": "Traffic",
+      "weight": "Bolder",
+      "spacing": "None"
+    },
+    {
+      "type": "ColumnSet",
+      "spacing": "Small",
+      "columns": [
+        {
+          "type": "Column",
+          "width": "stretch",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "\u2193 ${downloadSpeed}",
+              "size": "Small",
+              "color": "Good",
+              "weight": "Bolder",
+              "spacing": "None"
+            }
+          ]
+        },
+        {
+          "type": "Column",
+          "width": "stretch",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "\u2191 ${uploadSpeed}",
+              "size": "Small",
+              "color": "Accent",
+              "weight": "Bolder",
+              "spacing": "None"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Image",
+      "url": "${chartImage}",
+      "size": "Stretch",
+      "height": "32px",
+      "spacing": "Small",
+      "$when": "${sampleCount > 1}"
+    },
+    {
+      "type": "TextBlock",
+      "text": "${interfaceName}",
+      "size": "Small",
+      "isSubtle": true,
+      "spacing": "Small"
+    },
+    {
+      "type": "TextBlock",
+      "text": "Collecting data\u2026",
+      "size": "Small",
+      "isSubtle": true,
+      "spacing": "Small",
+      "$when": "${sampleCount < 2}"
+    }
+  ]
+}

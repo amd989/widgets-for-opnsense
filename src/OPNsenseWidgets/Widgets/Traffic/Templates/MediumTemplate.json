@@ -1,0 +1,76 @@
+{
+  "$schema": "https://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.6",
+  "body": [
+    {
+      "type": "ColumnSet",
+      "spacing": "None",
+      "columns": [
+        {
+          "type": "Column",
+          "width": "stretch",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "\u2193 ${downloadSpeed}",
+              "weight": "Bolder",
+              "color": "Good",
+              "spacing": "None"
+            }
+          ]
+        },
+        {
+          "type": "Column",
+          "width": "stretch",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "\u2191 ${uploadSpeed}",
+              "weight": "Bolder",
+              "color": "Accent",
+              "spacing": "None"
+            }
+          ]
+        },
+        {
+          "type": "Column",
+          "width": "auto",
+          "verticalContentAlignment": "Center",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "${lastRefresh}",
+              "size": "Small",
+              "isSubtle": true,
+              "spacing": "None"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Image",
+      "url": "${chartImage}",
+      "size": "Stretch",
+      "height": "80px",
+      "spacing": "Small",
+      "$when": "${sampleCount > 1}"
+    },
+    {
+      "type": "TextBlock",
+      "text": "Collecting data\u2026",
+      "size": "Small",
+      "isSubtle": true,
+      "spacing": "Medium",
+      "$when": "${sampleCount < 2}"
+    },
+    {
+      "type": "TextBlock",
+      "text": "${interfaceName}",
+      "size": "Small",
+      "isSubtle": true,
+      "spacing": "Small"
+    }
+  ]
+}

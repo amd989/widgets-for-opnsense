@@ -106,7 +106,38 @@
                     </ThemeResources>
                   </Definition>
 
-                  <!-- Future widget definitions go here -->
+                  <!-- Traffic Widget -->
+                  <Definition Id="Traffic_Widget"
+                              DisplayName="Traffic"
+                              Description="Shows real-time network traffic throughput for your OPNsense router's WAN interface"
+                              IsCustomizable="true"
+                              AllowMultiple="false">
+                    <Capabilities>
+                      <Capability>
+                        <Size Name="small" />
+                      </Capability>
+                      <Capability>
+                        <Size Name="medium" />
+                      </Capability>
+                      <Capability>
+                        <Size Name="large" />
+                      </Capability>
+                    </Capabilities>
+                    <ThemeResources>
+                      <Icons>
+                        <Icon Path="ProviderAssets\Traffic_Icon.png" />
+                      </Icons>
+                      <Screenshots>
+                        <Screenshot Path="ProviderAssets\Traffic_Screenshot.png"
+                                    DisplayAltText="Network traffic chart showing download and upload speeds" />
+                      </Screenshots>
+                      <DarkMode>
+                        <Icons>
+                          <Icon Path="ProviderAssets\Traffic_Icon.png" />
+                        </Icons>
+                      </DarkMode>
+                    </ThemeResources>
+                  </Definition>
                 </Definitions>
 
               </WidgetProvider>
