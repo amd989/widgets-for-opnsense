@@ -1,17 +1,11 @@
 {
-  "$schema": "https://adaptivecards.io/schemas/adaptive-card.json",
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
   "type": "AdaptiveCard",
   "version": "1.6",
   "body": [
     {
-      "type": "TextBlock",
-      "text": "Traffic",
-      "weight": "Bolder",
-      "spacing": "None"
-    },
-    {
       "type": "ColumnSet",
-      "spacing": "Small",
+      "spacing": "None",
       "columns": [
         {
           "type": "Column",
@@ -19,7 +13,7 @@
           "items": [
             {
               "type": "TextBlock",
-              "text": "\u2193 ${downloadSpeed}",
+              "text": "↓ ${downloadSpeed}",
               "size": "Small",
               "color": "Good",
               "weight": "Bolder",
@@ -33,7 +27,7 @@
           "items": [
             {
               "type": "TextBlock",
-              "text": "\u2191 ${uploadSpeed}",
+              "text": "↑ ${uploadSpeed}",
               "size": "Small",
               "color": "Accent",
               "weight": "Bolder",
@@ -56,7 +50,8 @@
       "text": "${interfaceName}",
       "size": "Small",
       "isSubtle": true,
-      "spacing": "Small"
+      "spacing": "Small",
+      "$when": "${sampleCount > 2}"
     },
     {
       "type": "TextBlock",

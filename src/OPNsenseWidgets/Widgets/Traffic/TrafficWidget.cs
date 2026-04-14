@@ -10,12 +10,13 @@ public sealed class TrafficWidget : IWidgetDefinition
 {
     public string DefinitionId => "Traffic_Widget";
     public string DisplayName => "Traffic";
+    public int RefreshIntervalSeconds => 1;
 
-    private const int MaxHistory = 30;
+    private const int MaxHistory = 20;
 
-    private readonly List<TrafficSample> _history = [];
-    private long _prevBytesIn;
-    private long _prevBytesOut;
+    private readonly Dictionary<string, List<TrafficSample>> _allHistory = new();
+    private readonly Dictionary<string, (long BytesIn, long BytesOut)> _prevBytes = new();
+    private readonly Dictionary<string, string> _interfaceNames = new();
     private DateTime _prevTimestamp;
     private string _wanDeviceName = "";
 
@@ -42,13 +43,46 @@ public sealed class TrafficWidget : IWidgetDefinition
                 HasData = false
             };
 
-        // Auto-detect WAN: reuse previously found device, then match name containing "WAN", then first
-        InterfaceStats? wan = null;
+        // Update friendly name cache
+        foreach (var kv in stats)
+            _interfaceNames[kv.Key] = kv.Value.Name;
 
-        if (!string.IsNullOrEmpty(_wanDeviceName) && stats.TryGetValue(_wanDeviceName, out wan))
+        var now = DateTime.Now;
+
+        if (_prevTimestamp != default)
         {
-            // Reuse previously detected interface
+            var elapsed = (now - _prevTimestamp).TotalSeconds;
+            if (elapsed > 0)
+            {
+                foreach (var kv in stats)
+                {
+                    _prevBytes.TryGetValue(kv.Key, out var prev);
+                    var deltaIn  = kv.Value.BytesReceived    - prev.BytesIn;
+                    var deltaOut = kv.Value.BytesTransmitted - prev.BytesOut;
+                    if (deltaIn  < 0) deltaIn  = kv.Value.BytesReceived;
+                    if (deltaOut < 0) deltaOut = kv.Value.BytesTransmitted;
+
+                    double ifaceInBps  = deltaIn  * 8.0 / elapsed;
+                    double ifaceOutBps = deltaOut * 8.0 / elapsed;
+
+                    if (!_allHistory.TryGetValue(kv.Key, out var hist))
+                    {
+                        hist = [];
+                        _allHistory[kv.Key] = hist;
+                    }
+                    hist.Add(new TrafficSample(now, ifaceInBps, ifaceOutBps));
+                    if (hist.Count > MaxHistory) hist.RemoveAt(0);
+                }
+            }
         }
+
+        foreach (var kv in stats)
+            _prevBytes[kv.Key] = (kv.Value.BytesReceived, kv.Value.BytesTransmitted);
+        _prevTimestamp = now;
+
+        // Auto-detect WAN for current speed display and medium/small charts
+        InterfaceStats? wan = null;
+        if (!string.IsNullOrEmpty(_wanDeviceName) && stats.TryGetValue(_wanDeviceName, out wan)) { }
         else
         {
             wan = stats.Values.FirstOrDefault(s =>
@@ -57,43 +91,24 @@ public sealed class TrafficWidget : IWidgetDefinition
             _wanDeviceName = wan.DeviceName;
         }
 
-        var now = DateTime.Now;
         double inBps = 0, outBps = 0;
-
-        if (_prevTimestamp != default)
+        if (_allHistory.TryGetValue(_wanDeviceName, out var wanHist) && wanHist.Count > 0)
         {
-            var elapsed = (now - _prevTimestamp).TotalSeconds;
-            if (elapsed > 0)
-            {
-                var deltaIn = wan.BytesReceived - _prevBytesIn;
-                var deltaOut = wan.BytesTransmitted - _prevBytesOut;
-
-                // Handle counter reset (reboot, overflow)
-                if (deltaIn < 0) deltaIn = wan.BytesReceived;
-                if (deltaOut < 0) deltaOut = wan.BytesTransmitted;
-
-                inBps = deltaIn * 8.0 / elapsed;
-                outBps = deltaOut * 8.0 / elapsed;
-
-                _history.Add(new TrafficSample(now, inBps, outBps));
-                if (_history.Count > MaxHistory)
-                    _history.RemoveAt(0);
-            }
+            inBps  = wanHist[^1].InBitsPerSecond;
+            outBps = wanHist[^1].OutBitsPerSecond;
         }
-
-        _prevBytesIn = wan.BytesReceived;
-        _prevBytesOut = wan.BytesTransmitted;
-        _prevTimestamp = now;
 
         return new TrafficData
         {
-            History = [.. _history],
+            History       = wanHist is not null ? [.. wanHist] : [],
             InterfaceName = wan.Name,
-            CurrentInBps = inBps,
+            CurrentInBps  = inBps,
             CurrentOutBps = outBps,
-            TotalBytesIn = wan.BytesReceived,
+            TotalBytesIn  = wan.BytesReceived,
             TotalBytesOut = wan.BytesTransmitted,
-            HasData = _history.Count > 0
+            HasData       = _allHistory.Values.Any(h => h.Count > 0),
+            AllHistory    = _allHistory.ToDictionary(kv => kv.Key, kv => kv.Value.ToList()),
+            InterfaceNames = new Dictionary<string, string>(_interfaceNames)
         };
     }
 
@@ -106,45 +121,142 @@ public sealed class TrafficWidget : IWidgetDefinition
         {
             return JsonSerializer.Serialize(new
             {
-                sampleCount = 0,
+                sampleCount   = 0,
                 downloadSpeed = "\u2014",
-                uploadSpeed = "\u2014",
+                uploadSpeed   = "\u2014",
                 interfaceName = traffic?.InterfaceName ?? "\u2014",
-                lastRefresh = now.ToString("h:mm tt"),
-                totalIn = "\u2014",
-                totalOut = "\u2014",
-                chartImage = ""
+                lastRefresh   = now.ToString("h:mm tt"),
+                totalIn       = "\u2014",
+                totalOut      = "\u2014",
+                chartImage    = "",
+                downloadChart = "",
+                uploadChart   = ""
             });
         }
 
-        var chartHeight = size switch
-        {
-            "small" => 32,
-            "large" => 140,
-            _ => 80
-        };
+        var sampleCount = traffic.History.Count;
 
-        var chartImage = traffic.History.Count >= 2
+        if (size == "large")
+        {
+            // Sort: WAN-named interfaces first, then alphabetical
+            var orderedKeys = traffic.AllHistory.Keys
+                .OrderByDescending(k =>
+                    traffic.InterfaceNames.GetValueOrDefault(k, k)
+                           .Contains("WAN", StringComparison.OrdinalIgnoreCase))
+                .ThenBy(k => traffic.InterfaceNames.GetValueOrDefault(k, k))
+                .ToList();
+
+            var downloadSeries = orderedKeys
+                .Where(k => traffic.AllHistory[k].Count >= 2)
+                .Select(k => (
+                    Label:  traffic.InterfaceNames.GetValueOrDefault(k, k),
+                    Values: traffic.AllHistory[k].Select(s => s.InBitsPerSecond).ToArray()))
+                .ToList();
+
+            var uploadSeries = orderedKeys
+                .Where(k => traffic.AllHistory[k].Count >= 2)
+                .Select(k => (
+                    Label:  traffic.InterfaceNames.GetValueOrDefault(k, k),
+                    Values: traffic.AllHistory[k].Select(s => s.OutBitsPerSecond).ToArray()))
+                .ToList();
+
+            var downloadChart = downloadSeries.Count > 0
+                ? TrafficChartRenderer.RenderMultiSeries(downloadSeries, width: 450, height: 130)
+                : "";
+            var uploadChart = uploadSeries.Count > 0
+                ? TrafficChartRenderer.RenderMultiSeries(uploadSeries, width: 450, height: 130)
+                : "";
+
+            var legendLabels = orderedKeys
+                .Select(k => traffic.InterfaceNames.GetValueOrDefault(k, k))
+                .ToList();
+            var legendImage = legendLabels.Count > 1
+                ? TrafficChartRenderer.RenderLegend(legendLabels, width: 280)
+                : "";
+
+            return JsonSerializer.Serialize(new
+            {
+                sampleCount,
+                downloadSpeed = FormatSpeed(traffic.CurrentInBps),
+                uploadSpeed   = FormatSpeed(traffic.CurrentOutBps),
+                interfaceName = traffic.InterfaceName,
+                totalIn       = FormatBytes(traffic.TotalBytesIn),
+                totalOut      = FormatBytes(traffic.TotalBytesOut),
+                lastRefresh   = now.ToString("h:mm tt"),
+                chartImage    = "",
+                downloadChart,
+                uploadChart,
+                legendImage
+            });
+        }
+
+        if (size == "small")
+        {
+            var chartImage = traffic.History.Count >= 2
+                ? TrafficChartRenderer.Render(
+                    traffic.History.Select(s => s.InBitsPerSecond).ToArray(),
+                    traffic.History.Select(s => s.OutBitsPerSecond).ToArray(),
+                    width: 450, height: 32)
+                : "";
+
+            return JsonSerializer.Serialize(new
+            {
+                sampleCount,
+                downloadSpeed = FormatSpeed(traffic.CurrentInBps),
+                uploadSpeed   = FormatSpeed(traffic.CurrentOutBps),
+                interfaceName = traffic.InterfaceName,
+                lastRefresh   = now.ToString("h:mm tt"),
+                chartImage,
+                lanChart      = "",
+                lanSampleCount = 0,
+                lanInterfaceName = ""
+            });
+        }
+
+        // medium — WAN chart + LAN chart
+        var wanChart = traffic.History.Count >= 2
             ? TrafficChartRenderer.Render(
                 traffic.History.Select(s => s.InBitsPerSecond).ToArray(),
                 traffic.History.Select(s => s.OutBitsPerSecond).ToArray(),
-                width: 560,
-                height: chartHeight)
+                width: 450, height: 60)
             : "";
 
-        var result = new
-        {
-            sampleCount = traffic.History.Count,
-            downloadSpeed = FormatSpeed(traffic.CurrentInBps),
-            uploadSpeed = FormatSpeed(traffic.CurrentOutBps),
-            interfaceName = traffic.InterfaceName,
-            totalIn = FormatBytes(traffic.TotalBytesIn),
-            totalOut = FormatBytes(traffic.TotalBytesOut),
-            lastRefresh = now.ToString("h:mm tt"),
-            chartImage
-        };
+        // Find LAN: prefer name containing "LAN", else first non-WAN interface
+        var wanKey = traffic.AllHistory.Keys.FirstOrDefault(k =>
+            traffic.InterfaceNames.GetValueOrDefault(k, k) == traffic.InterfaceName);
 
-        return JsonSerializer.Serialize(result);
+        var lanKey = traffic.AllHistory.Keys
+            .Where(k => k != wanKey)
+            .OrderByDescending(k => traffic.InterfaceNames.GetValueOrDefault(k, k)
+                                           .Contains("LAN", StringComparison.OrdinalIgnoreCase))
+            .FirstOrDefault();
+
+        var lanHistory = lanKey is not null
+            ? traffic.AllHistory.GetValueOrDefault(lanKey)
+            : null;
+        var lanInterfaceName = lanKey is not null
+            ? traffic.InterfaceNames.GetValueOrDefault(lanKey, lanKey)
+            : "";
+        var lanChart = lanHistory?.Count >= 2
+            ? TrafficChartRenderer.Render(
+                lanHistory.Select(s => s.InBitsPerSecond).ToArray(),
+                lanHistory.Select(s => s.OutBitsPerSecond).ToArray(),
+                width: 450, height: 60)
+            : "";
+        var lanSampleCount = lanHistory?.Count ?? 0;
+
+        return JsonSerializer.Serialize(new
+        {
+            sampleCount,
+            downloadSpeed    = FormatSpeed(traffic.CurrentInBps),
+            uploadSpeed      = FormatSpeed(traffic.CurrentOutBps),
+            interfaceName    = traffic.InterfaceName,
+            lastRefresh      = now.ToString("h:mm tt"),
+            chartImage       = wanChart,
+            lanChart,
+            lanSampleCount,
+            lanInterfaceName
+        });
     }
 
     private static string FormatSpeed(double bitsPerSecond)
@@ -152,9 +264,9 @@ public sealed class TrafficWidget : IWidgetDefinition
         return bitsPerSecond switch
         {
             >= 1_000_000_000 => $"{bitsPerSecond / 1_000_000_000:F2} Gbps",
-            >= 1_000_000 => $"{bitsPerSecond / 1_000_000:F1} Mbps",
-            >= 1_000 => $"{bitsPerSecond / 1_000:F0} Kbps",
-            _ => $"{bitsPerSecond:F0} bps"
+            >= 1_000_000     => $"{bitsPerSecond / 1_000_000:F1} Mbps",
+            >= 1_000         => $"{bitsPerSecond / 1_000:F0} Kbps",
+            _                => $"{bitsPerSecond:F0} bps"
         };
     }
 
@@ -163,9 +275,9 @@ public sealed class TrafficWidget : IWidgetDefinition
         return bytes switch
         {
             >= 1_073_741_824L => $"{(double)bytes / 1_073_741_824:F1} GB",
-            >= 1_048_576L => $"{(double)bytes / 1_048_576:F1} MB",
-            >= 1024L => $"{(double)bytes / 1024:F0} KB",
-            _ => $"{bytes} B"
+            >= 1_048_576L     => $"{(double)bytes / 1_048_576:F1} MB",
+            >= 1024L          => $"{(double)bytes / 1024:F0} KB",
+            _                 => $"{bytes} B"
         };
     }
 }

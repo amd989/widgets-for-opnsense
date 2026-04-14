@@ -51,10 +51,44 @@
     },
     {
       "type": "Image",
-      "url": "${chartImage}",
+      "url": "${legendImage}",
       "size": "Stretch",
-      "height": "140px",
+      "height": "22px",
       "spacing": "Small",
+      "$when": "${legendImage != ''}"
+    },
+    {
+      "type": "TextBlock",
+      "text": "\u2193 Download",
+      "size": "Small",
+      "color": "Good",
+      "weight": "Bolder",
+      "spacing": "Small",
+      "$when": "${sampleCount > 1}"
+    },
+    {
+      "type": "Image",
+      "url": "${downloadChart}",
+      "size": "Stretch",
+      "height": "130px",
+      "spacing": "None",
+      "$when": "${sampleCount > 1}"
+    },
+    {
+      "type": "TextBlock",
+      "text": "\u2191 Upload",
+      "size": "Small",
+      "color": "Accent",
+      "weight": "Bolder",
+      "spacing": "Small",
+      "$when": "${sampleCount > 1}"
+    },
+    {
+      "type": "Image",
+      "url": "${uploadChart}",
+      "size": "Stretch",
+      "height": "130px",
+      "spacing": "None",
       "$when": "${sampleCount > 1}"
     },
     {

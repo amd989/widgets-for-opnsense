@@ -50,12 +50,38 @@
       ]
     },
     {
+      "type": "TextBlock",
+      "text": "${interfaceName}",
+      "size": "Small",
+      "color": "Good",
+      "isSubtle": true,
+      "spacing": "Small",
+      "$when": "${sampleCount > 1}"
+    },
+    {
       "type": "Image",
       "url": "${chartImage}",
       "size": "Stretch",
-      "height": "80px",
-      "spacing": "Small",
+      "height": "60px",
+      "spacing": "None",
       "$when": "${sampleCount > 1}"
+    },
+    {
+      "type": "TextBlock",
+      "text": "${lanInterfaceName}",
+      "size": "Small",
+      "color": "Accent",
+      "isSubtle": true,
+      "spacing": "Small",
+      "$when": "${lanSampleCount > 1}"
+    },
+    {
+      "type": "Image",
+      "url": "${lanChart}",
+      "size": "Stretch",
+      "height": "60px",
+      "spacing": "None",
+      "$when": "${lanSampleCount > 1}"
     },
     {
       "type": "TextBlock",
@@ -64,13 +90,6 @@
       "isSubtle": true,
       "spacing": "Medium",
       "$when": "${sampleCount < 2}"
-    },
-    {
-      "type": "TextBlock",
-      "text": "${interfaceName}",
-      "size": "Small",
-      "isSubtle": true,
-      "spacing": "Small"
     }
   ]
 }

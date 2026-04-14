@@ -44,6 +44,70 @@ public static class TrafficChartRenderer
         return $"data:image/png;base64,{Convert.ToBase64String(data.ToArray())}";
     }
 
+    /// <summary>
+    /// Renders a horizontal legend strip — colored dot + label for each interface.
+    /// Uses the same palette order as RenderMultiSeries.
+    /// </summary>
+    public static string RenderLegend(IReadOnlyList<string> labels, int width = 560)
+    {
+        if (labels.Count == 0) return "";
+
+        const int height   = 22;
+        const int dotW     = 16;
+        const int dotH     = 4;
+        const float textSz = 13f;
+        const int gap      = 6;   // dot → text
+        const int itemGap  = 16;  // between items
+
+        using var surface = SKSurface.Create(
+            new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul));
+        var canvas = surface.Canvas;
+        canvas.Clear(SKColors.Transparent);
+
+        using var font = new SKFont(SKTypeface.Default, textSz);
+
+        // Measure items to center the row
+        var itemWidths = new float[labels.Count];
+        float totalW = 0;
+        for (var i = 0; i < labels.Count; i++)
+        {
+            itemWidths[i] = dotW + gap + font.MeasureText(labels[i]);
+            totalW += itemWidths[i] + (i > 0 ? itemGap : 0);
+        }
+
+        float x = Math.Max(4f, (width - totalW) / 2f);
+        float midY = height / 2f;
+
+        using var textPaint = new SKPaint { IsAntialias = true };
+
+        for (var i = 0; i < labels.Count; i++)
+        {
+            var color = Palette[i % Palette.Length];
+
+            using var linePaint = new SKPaint
+            {
+                IsAntialias = true,
+                Style       = SKPaintStyle.Fill,
+                Color       = color
+            };
+
+            // Colored line segment
+            var lineRect = new SKRect(x, midY - dotH / 2f, x + dotW, midY + dotH / 2f);
+            canvas.DrawRoundRect(lineRect, 2, 2, linePaint);
+
+            // Label
+            textPaint.Color = new SKColor(210, 210, 210);
+            canvas.DrawText(labels[i], x + dotW + gap, midY + textSz / 2f - 2f,
+                SKTextAlign.Left, font, textPaint);
+
+            x += itemWidths[i] + itemGap;
+        }
+
+        using var image = surface.Snapshot();
+        using var data  = image.Encode(SKEncodedImageFormat.Png, 90);
+        return $"data:image/png;base64,{Convert.ToBase64String(data.ToArray())}";
+    }
+
     private static readonly SKColor[] Palette =
     [
         new SKColor(45,  212, 160),  // teal

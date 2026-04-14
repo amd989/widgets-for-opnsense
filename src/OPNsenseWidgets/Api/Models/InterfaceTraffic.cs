@@ -24,4 +24,8 @@ public sealed class TrafficData
     public long TotalBytesIn { get; init; }
     public long TotalBytesOut { get; init; }
     public bool HasData { get; init; }
+    // Per-interface history for the large two-chart view (key = device name)
+    public Dictionary<string, List<TrafficSample>> AllHistory { get; init; } = [];
+    // Friendly display names keyed by device name
+    public Dictionary<string, string> InterfaceNames { get; init; } = [];
 }
