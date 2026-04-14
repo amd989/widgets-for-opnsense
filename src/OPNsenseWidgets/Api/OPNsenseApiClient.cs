@@ -138,25 +138,46 @@ public sealed class OPNsenseApiClient : IDisposable
             var json = await response.Content.ReadAsStringAsync(ct);
             Provider.OPNsenseWidgetProvider.Log(
                 $"GetInterfaceStatisticsAsync: bodyLength={json.Length}");
+            Provider.OPNsenseWidgetProvider.Log(
+                $"GetInterfaceStatisticsAsync: body preview={json[..Math.Min(800, json.Length)]}");
 
             using var doc = JsonDocument.Parse(json);
-            var result = new Dictionary<string, InterfaceStats>();
 
-            if (doc.RootElement.TryGetProperty("statistics", out var stats))
+            // OPNsense response shape: "statistics" is an object where each key is
+            // "[FriendlyName] (device) / address" and value holds counters per-address.
+            // One device may have multiple entries (MAC row + per-IP rows). The MAC row
+            // carries the aggregate interface counters — dedupe by device, pick max.
+            var raw = new List<(string OuterKey, InterfaceStats Stats)>();
+
+            if (doc.RootElement.TryGetProperty("statistics", out var stats) &&
+                stats.ValueKind == JsonValueKind.Object)
             {
                 foreach (var iface in stats.EnumerateObject())
                 {
-                    var obj = iface.Value;
-                    result[iface.Name] = new InterfaceStats
-                    {
-                        DeviceName = iface.Name,
-                        Name = GetJsonString(obj, "name"),
-                        BytesReceived = GetJsonLong(obj, "bytes received"),
-                        BytesTransmitted = GetJsonLong(obj, "bytes transmitted"),
-                        PacketsReceived = GetJsonLong(obj, "input packets"),
-                        PacketsTransmitted = GetJsonLong(obj, "output packets")
-                    };
+                    var deviceName = GetJsonString(iface.Value, "name");
+                    if (string.IsNullOrEmpty(deviceName))
+                        deviceName = iface.Name;
+
+                    if (IsSystemInterface(deviceName))
+                        continue;
+
+                    var friendly = ExtractFriendlyFromKey(iface.Name);
+                    raw.Add((iface.Name, ExtractStats(iface.Value, deviceName, friendly)));
                 }
+            }
+
+            var result = raw
+                .GroupBy(r => r.Stats.DeviceName)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.OrderByDescending(r =>
+                            r.Stats.BytesReceived + r.Stats.BytesTransmitted)
+                         .First().Stats);
+
+            foreach (var kv in result)
+            {
+                Provider.OPNsenseWidgetProvider.Log(
+                    $"  iface={kv.Key} name='{kv.Value.Name}' in={kv.Value.BytesReceived} out={kv.Value.BytesTransmitted}");
             }
 
             return result;
@@ -181,6 +202,89 @@ public sealed class OPNsenseApiClient : IDisposable
         }
     }
 
+    private static InterfaceStats ExtractStats(JsonElement obj, string deviceName, string friendly)
+    {
+        if (string.IsNullOrEmpty(friendly))
+            friendly = FirstNonEmptyString(obj, "descr", "description");
+        if (string.IsNullOrEmpty(friendly))
+        {
+            var n = GetJsonString(obj, "name");
+            if (!string.IsNullOrEmpty(n) && !n.Equals(deviceName, StringComparison.OrdinalIgnoreCase))
+                friendly = n;
+        }
+        if (string.IsNullOrEmpty(friendly))
+            friendly = deviceName;
+
+        return new InterfaceStats
+        {
+            DeviceName = deviceName,
+            Name = friendly,
+            BytesReceived = FirstLong(obj,
+                "received-bytes", "bytes received", "bytes-received", "bytes_received",
+                "bytes in", "bytes-in", "bytes_in", "rx_bytes"),
+            BytesTransmitted = FirstLong(obj,
+                "sent-bytes", "bytes transmitted", "bytes-transmitted", "bytes_transmitted",
+                "bytes out", "bytes-out", "bytes_out", "tx_bytes"),
+            PacketsReceived = FirstLong(obj,
+                "received-packets", "input packets", "packets received", "packets-received",
+                "packets_received", "rx_packets"),
+            PacketsTransmitted = FirstLong(obj,
+                "sent-packets", "output packets", "packets transmitted", "packets-transmitted",
+                "packets_transmitted", "tx_packets")
+        };
+    }
+
+    private static readonly string[] SystemInterfacePrefixes =
+        ["enc", "pfsync", "pflog", "lo", "faith", "tap", "tun", "ipsec", "gif", "gre", "stf", "bridge"];
+
+    private static bool IsSystemInterface(string deviceName)
+    {
+        foreach (var prefix in SystemInterfacePrefixes)
+            if (deviceName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                return true;
+        return false;
+    }
+
+    private static string ExtractFriendlyFromKey(string outerKey)
+    {
+        // Format: "[WAN] (vmx0) / 00:0c:29:a3:6d:9e" — pull "WAN" from brackets.
+        var start = outerKey.IndexOf('[');
+        var end = outerKey.IndexOf(']');
+        if (start >= 0 && end > start + 1)
+            return outerKey.Substring(start + 1, end - start - 1).Trim();
+        return "";
+    }
+
+    private static string FirstNonEmptyString(JsonElement obj, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            var val = GetJsonString(obj, key);
+            if (!string.IsNullOrWhiteSpace(val)) return val;
+        }
+        return "";
+    }
+
+    private static long FirstLong(JsonElement obj, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (obj.TryGetProperty(key, out var val))
+            {
+                var n = ReadLong(val);
+                if (n > 0) return n;
+            }
+        }
+        return 0;
+    }
+
+    private static long ReadLong(JsonElement val) => val.ValueKind switch
+    {
+        JsonValueKind.Number when val.TryGetInt64(out var n) => n,
+        JsonValueKind.String when long.TryParse(val.GetString(), out var n) => n,
+        _ => 0
+    };
+
     private static string GetJsonString(JsonElement obj, string property)
     {
         if (obj.TryGetProperty(property, out var val))
@@ -191,12 +295,7 @@ public sealed class OPNsenseApiClient : IDisposable
     private static long GetJsonLong(JsonElement obj, string property)
     {
         if (!obj.TryGetProperty(property, out var val)) return 0;
-        return val.ValueKind switch
-        {
-            JsonValueKind.Number => val.GetInt64(),
-            JsonValueKind.String when long.TryParse(val.GetString(), out var n) => n,
-            _ => 0
-        };
+        return ReadLong(val);
     }
 
     public void Dispose() => _httpClient.Dispose();

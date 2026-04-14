@@ -44,6 +44,52 @@ public static class TrafficChartRenderer
         return $"data:image/png;base64,{Convert.ToBase64String(data.ToArray())}";
     }
 
+    private static readonly SKColor[] Palette =
+    [
+        new SKColor(45,  212, 160),  // teal
+        new SKColor(96,  165, 250),  // blue
+        new SKColor(251, 191,  36),  // amber
+        new SKColor(248, 113, 113),  // red
+        new SKColor(167, 139, 250),  // purple
+    ];
+
+    /// <summary>
+    /// Renders multiple single-direction series (e.g. all-interface download) on one chart.
+    /// </summary>
+    public static string RenderMultiSeries(
+        IReadOnlyList<(string Label, double[] Values)> series,
+        int width = 560,
+        int height = 90)
+    {
+        if (series.Count == 0) return "";
+        var maxLen = series.Max(s => s.Values.Length);
+        if (maxLen < 2) return "";
+
+        var maxVal = series.SelectMany(s => s.Values).DefaultIfEmpty(1).Max();
+        if (maxVal == 0) maxVal = 1;
+
+        using var surface = SKSurface.Create(
+            new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul));
+        var canvas = surface.Canvas;
+        canvas.Clear(SKColors.Transparent);
+
+        const float pad = 4f;
+        var plotW = width - pad * 2;
+        var plotH = height - pad * 2;
+
+        for (var i = 0; i < series.Count; i++)
+        {
+            var values = series[i].Values;
+            if (values.Length < 2) continue;
+            DrawSeries(canvas, values, maxVal, pad, pad, plotW, plotH, values.Length,
+                Palette[i % Palette.Length]);
+        }
+
+        using var image = surface.Snapshot();
+        using var data  = image.Encode(SKEncodedImageFormat.Png, 90);
+        return $"data:image/png;base64,{Convert.ToBase64String(data.ToArray())}";
+    }
+
     private static void DrawSeries(
         SKCanvas canvas,
         double[] values,

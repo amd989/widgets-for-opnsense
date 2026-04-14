@@ -108,118 +108,45 @@
       ]
     },
     {
-      "type": "ColumnSet",
+      "type": "Carousel",
       "spacing": "Small",
-      "columns": [
+      "$when": "${pageCount > 0}",
+      "pages": [
         {
-          "type": "Column",
-          "width": "stretch",
+          "type": "CarouselPage",
+          "$data": "${pages}",
           "items": [
             {
-              "type": "Container",
-              "$data": "${col1}",
-              "style": "${style}",
-              "spacing": "Small",
-              "items": [
+              "type": "ColumnSet",
+              "spacing": "None",
+              "columns": [
                 {
-                  "type": "ColumnSet",
-                  "spacing": "None",
-                  "columns": [
+                  "type": "Column",
+                  "width": "stretch",
+                  "items": [
                     {
-                      "type": "Column",
-                      "width": "stretch",
-                      "items": [
-                        {
-                          "type": "TextBlock",
-                          "text": "${hostname}",
-                          "size": "Small",
-                          "weight": "Bolder",
-                          "spacing": "None"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "Column",
-                      "width": "auto",
-                      "items": [
-                        {
-                          "type": "TextBlock",
-                          "text": "${time}",
-                          "size": "Small",
-                          "isSubtle": true,
-                          "spacing": "None"
-                        }
-                      ]
+                      "type": "Image",
+                      "$data": "${col1}",
+                      "url": "${img}",
+                      "size": "Stretch",
+                      "spacing": "Small"
                     }
                   ]
                 },
                 {
-                  "type": "TextBlock",
-                  "text": "${meta}",
-                  "size": "Small",
-                  "isSubtle": true,
-                  "spacing": "None",
-                  "$when": "${meta != ''}"
-                }
-              ],
-              "showBorder": true,
-              "roundedCorners": true
-            }
-          ]
-        },
-        {
-          "type": "Column",
-          "width": "stretch",
-          "items": [
-            {
-              "type": "Container",
-              "$data": "${col2}",
-              "style": "${style}",
-              "spacing": "Small",
-              "items": [
-                {
-                  "type": "ColumnSet",
-                  "spacing": "None",
-                  "columns": [
+                  "type": "Column",
+                  "width": "stretch",
+                  "items": [
                     {
-                      "type": "Column",
-                      "width": "stretch",
-                      "items": [
-                        {
-                          "type": "TextBlock",
-                          "text": "${hostname}",
-                          "size": "Small",
-                          "weight": "Bolder",
-                          "spacing": "None"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "Column",
-                      "width": "auto",
-                      "items": [
-                        {
-                          "type": "TextBlock",
-                          "text": "${time}",
-                          "size": "Small",
-                          "isSubtle": true,
-                          "spacing": "None"
-                        }
-                      ]
+                      "type": "Image",
+                      "$data": "${col2}",
+                      "url": "${img}",
+                      "size": "Stretch",
+                      "spacing": "Small"
                     }
                   ]
-                },
-                {
-                  "type": "TextBlock",
-                  "text": "${meta}",
-                  "size": "Small",
-                  "isSubtle": true,
-                  "spacing": "None",
-                  "$when": "${meta != ''}"
                 }
-              ],
-              "roundedCorners": true,
-              "showBorder": true
+              ]
             }
           ]
         }
@@ -227,10 +154,10 @@
     },
     {
       "type": "TextBlock",
-      "text": "${displayedLeases} of ${totalLeases}",
+      "text": "Page 1 of ${pageCount} \u00b7 ${displayedLeases} of ${totalLeases}",
       "size": "Small",
       "isSubtle": true,
-      "spacing": "Small",
+      "spacing": "ExtraLarge",
       "$when": "${totalLeases > 0}"
     }
   ]
