@@ -38,7 +38,7 @@
     },
     {
       "type": "Carousel",
-      "spacing": "None,
+      "spacing": "Small",
       "$when": "${pageCount > 0}",
       "pages": [
         {

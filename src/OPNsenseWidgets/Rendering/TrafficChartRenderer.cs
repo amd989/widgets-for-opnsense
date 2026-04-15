@@ -184,28 +184,37 @@ public static class TrafficChartRenderer
 
         var bottom = padT + plotH;
 
+        // Precompute point coords
+        var pts = new SKPoint[count];
         for (var i = 0; i < count; i++)
         {
             var x = padL + (float)i / (count - 1) * plotW;
             var ratio = (float)(values[i] / maxVal);
             var y = padT + plotH - ratio * plotH;
+            pts[i] = new SKPoint(x, y);
+        }
 
-            if (i == 0)
-            {
-                linePath.MoveTo(x, y);
-                fillPath.MoveTo(x, bottom);
-                fillPath.LineTo(x, y);
-            }
-            else
-            {
-                linePath.LineTo(x, y);
-                fillPath.LineTo(x, y);
-            }
+        // Catmull-Rom → cubic bezier (tension 0.5 for smooth but not overshoot-prone)
+        linePath.MoveTo(pts[0]);
+        fillPath.MoveTo(pts[0].X, bottom);
+        fillPath.LineTo(pts[0]);
+
+        for (var i = 0; i < count - 1; i++)
+        {
+            var p0 = i == 0 ? pts[i] : pts[i - 1];
+            var p1 = pts[i];
+            var p2 = pts[i + 1];
+            var p3 = i + 2 < count ? pts[i + 2] : pts[i + 1];
+
+            var cp1 = new SKPoint(p1.X + (p2.X - p0.X) / 6f, p1.Y + (p2.Y - p0.Y) / 6f);
+            var cp2 = new SKPoint(p2.X - (p3.X - p1.X) / 6f, p2.Y - (p3.Y - p1.Y) / 6f);
+
+            linePath.CubicTo(cp1, cp2, p2);
+            fillPath.CubicTo(cp1, cp2, p2);
         }
 
         // Close fill area back to baseline
-        var lastX = padL + (float)(count - 1) / (count - 1) * plotW;
-        fillPath.LineTo(lastX, bottom);
+        fillPath.LineTo(pts[count - 1].X, bottom);
         fillPath.Close();
 
         canvas.DrawPath(fillPath, fillPaint);

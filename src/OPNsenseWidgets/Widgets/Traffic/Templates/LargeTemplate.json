@@ -59,7 +59,7 @@
     },
     {
       "type": "TextBlock",
-      "text": "\u2193 Download",
+      "text": "\u2193 Traffic In",
       "size": "Small",
       "color": "Good",
       "weight": "Bolder",
@@ -70,13 +70,13 @@
       "type": "Image",
       "url": "${downloadChart}",
       "size": "Stretch",
-      "height": "130px",
+      "height": "145px",
       "spacing": "None",
       "$when": "${sampleCount > 1}"
     },
     {
       "type": "TextBlock",
-      "text": "\u2191 Upload",
+      "text": "\u2191 Traffic Out",
       "size": "Small",
       "color": "Accent",
       "weight": "Bolder",
@@ -87,7 +87,7 @@
       "type": "Image",
       "url": "${uploadChart}",
       "size": "Stretch",
-      "height": "130px",
+      "height": "145px",
       "spacing": "None",
       "$when": "${sampleCount > 1}"
     },
@@ -131,13 +131,6 @@
           ]
         }
       ]
-    },
-    {
-      "type": "TextBlock",
-      "text": "${interfaceName} \u00b7 ${sampleCount} samples",
-      "size": "Small",
-      "isSubtle": true,
-      "spacing": "Small"
     }
   ]
 }

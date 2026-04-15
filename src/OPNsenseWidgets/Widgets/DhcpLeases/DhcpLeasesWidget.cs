@@ -12,6 +12,7 @@ public sealed class DhcpLeasesWidget : IWidgetDefinition
     public string DisplayName => "DHCP Leases";
 
     private const int MaxPages = 5;
+    private readonly List<(DateTime Time, int Count)> _history = [];
 
     private static readonly Dictionary<string, int> CardsPerPage = new()
     {
@@ -106,7 +107,7 @@ public sealed class DhcpLeasesWidget : IWidgetDefinition
             reservedCount,
             lastRefresh = now.ToString("h:mm tt"),
             pages,
-            sparkline = BuildSparkline(leases, now)
+            sparkline = BuildSparkline(leases.Count, now)
         };
 
         return JsonSerializer.Serialize(result);
@@ -139,25 +140,20 @@ public sealed class DhcpLeasesWidget : IWidgetDefinition
         return vendor;
     }
 
-    private static string BuildSparkline(List<DhcpLease> leases, DateTime now)
+    private string BuildSparkline(int currentCount, DateTime now)
     {
+        _history.Add((now, currentCount));
+        _history.RemoveAll(h => (now - h.Time).TotalHours > 25);
+
+        // buckets[0] = 24h ago, buckets[23] = now
         var buckets = new int[24];
-
-        foreach (var lease in leases)
+        foreach (var (time, count) in _history)
         {
-            var start = lease.EffectiveLeaseStart;
-            if (start == DateTime.MinValue) continue;
-
-            var age = now - start;
-            if (age.TotalHours >= 0 && age.TotalHours < 24)
-            {
-                var bucket = (int)age.TotalHours;
-                if (bucket < 24) buckets[bucket]++;
-            }
+            var age = now - time;
+            if (age.TotalHours >= 24) continue;
+            var slot = 23 - (int)age.TotalHours;
+            buckets[slot] = Math.Max(buckets[slot], count);
         }
-
-        // Reverse so index 0 = 24h ago, index 23 = now
-        Array.Reverse(buckets);
 
         return SparklineRenderer.Render(buckets);
     }

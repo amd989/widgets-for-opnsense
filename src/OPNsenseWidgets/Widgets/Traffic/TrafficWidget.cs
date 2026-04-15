@@ -17,6 +17,7 @@ public sealed class TrafficWidget : IWidgetDefinition
     private readonly Dictionary<string, List<TrafficSample>> _allHistory = new();
     private readonly Dictionary<string, (long BytesIn, long BytesOut)> _prevBytes = new();
     private readonly Dictionary<string, string> _interfaceNames = new();
+    private readonly SemaphoreSlim _stateLock = new(1, 1);
     private DateTime _prevTimestamp;
     private string _wanDeviceName = "";
 
@@ -43,6 +44,9 @@ public sealed class TrafficWidget : IWidgetDefinition
                 HasData = false
             };
 
+        await _stateLock.WaitAsync(ct);
+        try
+        {
         // Update friendly name cache
         foreach (var kv in stats)
             _interfaceNames[kv.Key] = kv.Value.Name;
@@ -110,6 +114,11 @@ public sealed class TrafficWidget : IWidgetDefinition
             AllHistory    = _allHistory.ToDictionary(kv => kv.Key, kv => kv.Value.ToList()),
             InterfaceNames = new Dictionary<string, string>(_interfaceNames)
         };
+        }
+        finally
+        {
+            _stateLock.Release();
+        }
     }
 
     public string BuildDataJson(object? data, string size)
@@ -161,10 +170,10 @@ public sealed class TrafficWidget : IWidgetDefinition
                 .ToList();
 
             var downloadChart = downloadSeries.Count > 0
-                ? TrafficChartRenderer.RenderMultiSeries(downloadSeries, width: 450, height: 130)
+                ? TrafficChartRenderer.RenderMultiSeries(downloadSeries, width: 450, height: 145)
                 : "";
             var uploadChart = uploadSeries.Count > 0
-                ? TrafficChartRenderer.RenderMultiSeries(uploadSeries, width: 450, height: 130)
+                ? TrafficChartRenderer.RenderMultiSeries(uploadSeries, width: 450, height: 145)
                 : "";
 
             var legendLabels = orderedKeys
@@ -218,7 +227,7 @@ public sealed class TrafficWidget : IWidgetDefinition
             ? TrafficChartRenderer.Render(
                 traffic.History.Select(s => s.InBitsPerSecond).ToArray(),
                 traffic.History.Select(s => s.OutBitsPerSecond).ToArray(),
-                width: 450, height: 60)
+                width: 450, height: 90)
             : "";
 
         // Find LAN: prefer name containing "LAN", else first non-WAN interface
@@ -241,7 +250,7 @@ public sealed class TrafficWidget : IWidgetDefinition
             ? TrafficChartRenderer.Render(
                 lanHistory.Select(s => s.InBitsPerSecond).ToArray(),
                 lanHistory.Select(s => s.OutBitsPerSecond).ToArray(),
-                width: 450, height: 60)
+                width: 450, height: 95)
             : "";
         var lanSampleCount = lanHistory?.Count ?? 0;
 
