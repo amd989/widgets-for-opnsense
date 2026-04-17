@@ -6,6 +6,7 @@ namespace OPNsenseWidgets.Refresh;
 public sealed class RefreshService : IDisposable
 {
     private readonly OPNsenseWidgetProvider _provider;
+    private readonly ISettingsManager _settingsManager;
     private Timer? _timer;
     private readonly CancellationTokenSource _cts = new();
 
@@ -14,9 +15,10 @@ public sealed class RefreshService : IDisposable
     private DateTime _settingsLoadedAt = DateTime.MinValue;
     private static readonly TimeSpan SettingsTtl = TimeSpan.FromSeconds(30);
 
-    public RefreshService(OPNsenseWidgetProvider provider)
+    public RefreshService(OPNsenseWidgetProvider provider, ISettingsManager settingsManager)
     {
         _provider = provider;
+        _settingsManager = settingsManager;
     }
 
     public void Start()
@@ -69,7 +71,7 @@ public sealed class RefreshService : IDisposable
 
     private void ReloadSettings()
     {
-        _cachedSettings = SettingsManager.Load();
+        _cachedSettings = _settingsManager.Load();
         _settingsLoadedAt = DateTime.Now;
     }
 

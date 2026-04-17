@@ -2,28 +2,33 @@ using System.Text.Json;
 
 namespace OPNsenseWidgets.Configuration;
 
-public static class SettingsManager
+public sealed class SettingsManager : ISettingsManager
 {
     // Use Desktop parent (non-virtualized by MSIX) so settings survive reinstall
-    private static readonly string SettingsDir = Path.Combine(
+    private readonly string _settingsDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".opnsense-widgets");
 
-    private static readonly string SettingsPath = Path.Combine(SettingsDir, "settings.json");
+    private readonly string _settingsPath;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true
     };
 
-    public static WidgetSettings Load()
+    public SettingsManager()
     {
-        if (!File.Exists(SettingsPath))
+        _settingsPath = Path.Combine(_settingsDir, "settings.json");
+    }
+
+    public WidgetSettings Load()
+    {
+        if (!File.Exists(_settingsPath))
             return new WidgetSettings();
 
         try
         {
-            var json = File.ReadAllText(SettingsPath);
+            var json = File.ReadAllText(_settingsPath);
             return JsonSerializer.Deserialize<WidgetSettings>(json, JsonOptions)
                 ?? new WidgetSettings();
         }
@@ -33,10 +38,10 @@ public static class SettingsManager
         }
     }
 
-    public static void Save(WidgetSettings settings)
+    public void Save(WidgetSettings settings)
     {
-        Directory.CreateDirectory(SettingsDir);
+        Directory.CreateDirectory(_settingsDir);
         var json = JsonSerializer.Serialize(settings, JsonOptions);
-        File.WriteAllText(SettingsPath, json);
+        File.WriteAllText(_settingsPath, json);
     }
 }

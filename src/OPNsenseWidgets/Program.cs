@@ -1,6 +1,13 @@
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.DependencyInjection;
+using OPNsenseWidgets.Api;
+using OPNsenseWidgets.Configuration;
 using OPNsenseWidgets.Provider;
 using OPNsenseWidgets.Refresh;
+using OPNsenseWidgets.Widgets;
+using OPNsenseWidgets.Widgets.DhcpLeases;
+using OPNsenseWidgets.Widgets.Firewall;
+using OPNsenseWidgets.Widgets.Traffic;
 
 namespace OPNsenseWidgets;
 
@@ -24,13 +31,34 @@ internal class Program
 
     static void Main(string[] args)
     {
-        OPNsenseWidgets.Provider.OPNsenseWidgetProvider.Log($"Main started, args=[{string.Join(", ", args)}]");
+        OPNsenseWidgetProvider.Log($"Main started, args=[{string.Join(", ", args)}]");
 
         WinRT.ComWrappersSupport.InitializeComWrappers();
-        OPNsenseWidgets.Provider.OPNsenseWidgetProvider.Log("InitializeComWrappers done");
+        OPNsenseWidgetProvider.Log("InitializeComWrappers done");
 
-        var provider = new OPNsenseWidgetProvider();
-        var factory = new WidgetProviderFactory(provider);
+        var services = new ServiceCollection();
+
+        // Configuration
+        services.AddSingleton<ISettingsManager, SettingsManager>();
+        services.AddSingleton<ICredentialStore, CredentialStore>();
+
+        // API
+        services.AddSingleton<IOPNsenseApiClientFactory, OPNsenseApiClientFactory>();
+
+        // Widget definitions
+        services.AddSingleton<IWidgetDefinition, DhcpLeasesWidget>();
+        services.AddSingleton<IWidgetDefinition, TrafficWidget>();
+        services.AddSingleton<IWidgetDefinition, FirewallWidget>();
+
+        // Provider and factory
+        services.AddSingleton<OPNsenseWidgetProvider>();
+        services.AddSingleton<WidgetProviderFactory>();
+        services.AddSingleton<RefreshService>();
+
+        using var serviceProvider = services.BuildServiceProvider();
+
+        var provider = serviceProvider.GetRequiredService<OPNsenseWidgetProvider>();
+        var factory = serviceProvider.GetRequiredService<WidgetProviderFactory>();
 
         var hr = CoRegisterClassObject(
             ProviderClsid,
@@ -39,7 +67,7 @@ internal class Program
             REGCLS_MULTIPLEUSE,
             out var cookie);
 
-        OPNsenseWidgets.Provider.OPNsenseWidgetProvider.Log($"CoRegisterClassObject hr=0x{hr:X8} cookie={cookie}");
+        OPNsenseWidgetProvider.Log($"CoRegisterClassObject hr=0x{hr:X8} cookie={cookie}");
 
         if (hr != 0)
         {
@@ -49,13 +77,13 @@ internal class Program
 
         provider.RecoverRunningWidgets();
 
-        using var refreshService = new RefreshService(provider);
+        var refreshService = serviceProvider.GetRequiredService<RefreshService>();
         refreshService.Start();
 
-        OPNsenseWidgets.Provider.OPNsenseWidgetProvider.Log("Waiting for EmptyEvent...");
+        OPNsenseWidgetProvider.Log("Waiting for EmptyEvent...");
         provider.EmptyEvent.Wait();
 
-        OPNsenseWidgets.Provider.OPNsenseWidgetProvider.Log("EmptyEvent fired, shutting down");
+        OPNsenseWidgetProvider.Log("EmptyEvent fired, shutting down");
         refreshService.Stop();
         CoRevokeClassObject(cookie);
     }

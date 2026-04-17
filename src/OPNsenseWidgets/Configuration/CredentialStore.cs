@@ -2,17 +2,17 @@ using AdysTech.CredentialManager;
 
 namespace OPNsenseWidgets.Configuration;
 
-public static class CredentialStore
+public sealed class CredentialStore : ICredentialStore
 {
     private const string TargetName = "OPNsenseWidgets/ApiCredentials";
 
-    public static void SaveCredentials(string apiKey, string apiSecret)
+    public void SaveCredentials(string apiKey, string apiSecret)
     {
         var credential = new System.Net.NetworkCredential(apiKey, apiSecret);
         CredentialManager.SaveCredentials(TargetName, credential);
     }
 
-    public static (string ApiKey, string ApiSecret)? LoadCredentials()
+    public (string ApiKey, string ApiSecret)? LoadCredentials()
     {
         try
         {
@@ -28,7 +28,7 @@ public static class CredentialStore
         }
     }
 
-    public static void DeleteCredentials()
+    public void DeleteCredentials()
     {
         try
         {

@@ -4,9 +4,6 @@ using Microsoft.Windows.Widgets.Providers;
 using OPNsenseWidgets.Api;
 using OPNsenseWidgets.Configuration;
 using OPNsenseWidgets.Widgets;
-using OPNsenseWidgets.Widgets.DhcpLeases;
-using OPNsenseWidgets.Widgets.Firewall;
-using OPNsenseWidgets.Widgets.Traffic;
 
 namespace OPNsenseWidgets.Provider;
 
@@ -15,6 +12,9 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
     private readonly Dictionary<string, WidgetInfo> _runningWidgets = [];
     private readonly Dictionary<string, IWidgetDefinition> _definitions = [];
     private readonly object _lock = new();
+    private readonly ISettingsManager _settingsManager;
+    private readonly ICredentialStore _credentialStore;
+    private readonly IOPNsenseApiClientFactory _apiClientFactory;
 
     // Desktop is always writable for full-trust packaged apps
     private static readonly string LogPath = Path.Combine(
@@ -23,12 +23,19 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
 
     public ManualResetEventSlim EmptyEvent { get; } = new(false);
 
-    public OPNsenseWidgetProvider()
+    public OPNsenseWidgetProvider(
+        IEnumerable<IWidgetDefinition> widgetDefinitions,
+        ISettingsManager settingsManager,
+        ICredentialStore credentialStore,
+        IOPNsenseApiClientFactory apiClientFactory)
     {
+        _settingsManager = settingsManager;
+        _credentialStore = credentialStore;
+        _apiClientFactory = apiClientFactory;
+
         Log("Provider constructed");
-        RegisterDefinition(new DhcpLeasesWidget());
-        RegisterDefinition(new TrafficWidget());
-        RegisterDefinition(new FirewallWidget());
+        foreach (var definition in widgetDefinitions)
+            RegisterDefinition(definition);
     }
 
     internal static void Log(string message)
@@ -248,8 +255,8 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
         Log($"UpdateWidget: id={info.WidgetId} defId={info.DefinitionId} size={info.CurrentSize}");
         try
         {
-            var settings = SettingsManager.Load();
-            var credentials = CredentialStore.LoadCredentials();
+            var settings = _settingsManager.Load();
+            var credentials = _credentialStore.LoadCredentials();
 
             string template;
             string data;
@@ -307,8 +314,8 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
         Log($"UpdateWidgetWithConfigTemplate: id={info.WidgetId}");
         try
         {
-            var settings = SettingsManager.Load();
-            var credentials = CredentialStore.LoadCredentials();
+            var settings = _settingsManager.Load();
+            var credentials = _credentialStore.LoadCredentials();
 
             var template = TemplateHelper.LoadSharedTemplate("ConfigurationTemplate.json");
             var data = JsonSerializer.Serialize(new
@@ -354,13 +361,13 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
             refreshInterval = Math.Clamp(refreshInterval, 10, 300);
 
             if (!string.IsNullOrWhiteSpace(apiKey) && !string.IsNullOrWhiteSpace(apiSecret))
-                CredentialStore.SaveCredentials(apiKey, apiSecret);
+                _credentialStore.SaveCredentials(apiKey, apiSecret);
 
-            var settings = SettingsManager.Load();
+            var settings = _settingsManager.Load();
             settings.HostUrl = hostUrl;
             settings.AllowSelfSignedCertificates = allowSelfSigned;
             settings.RefreshIntervalSeconds = refreshInterval;
-            SettingsManager.Save(settings);
+            _settingsManager.Save(settings);
 
             Log($"SaveConfiguration: saved host={hostUrl} allowSelfSigned={allowSelfSigned} interval={refreshInterval}");
         }
@@ -376,10 +383,8 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
         if (!_definitions.TryGetValue(info.DefinitionId, out var definition))
             return;
 
-        var settings = SettingsManager.Load();
-        var credentials = CredentialStore.LoadCredentials();
-
-        if (!settings.IsConfigured || credentials is null)
+        using var client = _apiClientFactory.Create();
+        if (client is null)
         {
             info.LastError = null;
             info.CachedData = null;
@@ -389,12 +394,6 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
 
         try
         {
-            using var client = new OPNsenseApiClient(
-                settings.HostUrl,
-                credentials.Value.ApiKey,
-                credentials.Value.ApiSecret,
-                settings.AllowSelfSignedCertificates);
-
             var data = await definition.FetchDataAsync(client);
             info.CachedData = data;
             info.LastError = null;
@@ -413,10 +412,9 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
     private async Task TestConnectionAsync(WidgetInfo info)
     {
         Log("TestConnectionAsync called");
-        var settings = SettingsManager.Load();
-        var credentials = CredentialStore.LoadCredentials();
 
-        if (!settings.IsConfigured || credentials is null)
+        using var client = _apiClientFactory.Create();
+        if (client is null)
         {
             info.TestResult = "Enter URL and credentials first.";
             UpdateWidgetWithConfigTemplate(info);
@@ -425,12 +423,6 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
 
         try
         {
-            using var client = new OPNsenseApiClient(
-                settings.HostUrl,
-                credentials.Value.ApiKey,
-                credentials.Value.ApiSecret,
-                settings.AllowSelfSignedCertificates);
-
             await client.GetLeasesAsync(page: 1, rowCount: 1);
             info.LastError = null;
             info.TestResult = "Connection successful!";
@@ -502,7 +494,7 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
                 return;
             }
 
-            CredentialStore.SaveCredentials(apiKey, apiSecret);
+            _credentialStore.SaveCredentials(apiKey, apiSecret);
             info.TestResult = $"Imported from {Path.GetFileName(newest)}";
             Log($"ImportKeyFile: imported from {Path.GetFileName(newest)}");
         }
