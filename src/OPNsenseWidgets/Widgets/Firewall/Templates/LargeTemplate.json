@@ -1,0 +1,83 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.6",
+  "body": [
+    {
+      "type": "Container",
+      "spacing": "None",
+      "horizontalAlignment": "Center",
+      "$when": "${hasData}",
+      "items": [
+        {
+          "type": "Image",
+          "url": "${donutImage}",
+          "width": "200px",
+          "height": "200px",
+          "horizontalAlignment": "Center",
+          "spacing": "None"
+        }
+      ]
+    },
+    {
+      "type": "Image",
+      "url": "${legendImage}",
+      "size": "Stretch",
+      "spacing": "Medium",
+      "$when": "${hasData}"
+    },
+    {
+      "type": "ColumnSet",
+      "spacing": "Medium",
+      "$when": "${hasData}",
+      "columns": [
+        {
+          "type": "Column",
+          "width": "stretch",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "${totalEvaluations} evaluations",
+              "size": "Small",
+              "isSubtle": true,
+              "spacing": "None"
+            }
+          ]
+        },
+        {
+          "type": "Column",
+          "width": "stretch",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "${totalPackets} packets",
+              "size": "Small",
+              "isSubtle": true,
+              "spacing": "None"
+            }
+          ]
+        },
+        {
+          "type": "Column",
+          "width": "auto",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "${lastRefresh}",
+              "size": "Small",
+              "isSubtle": true,
+              "spacing": "None"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "TextBlock",
+      "text": "No firewall activity yet\u2026",
+      "size": "Small",
+      "isSubtle": true,
+      "$when": "${!hasData}"
+    }
+  ]
+}

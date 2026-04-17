@@ -1,0 +1,45 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.6",
+  "body": [
+    {
+      "type": "Container",
+      "horizontalAlignment": "Center",
+      "spacing": "None",
+      "$when": "${hasData}",
+      "items": [
+        {
+          "type": "Image",
+          "url": "${donutImage}",
+          "width": "130px",
+          "height": "130px",
+          "horizontalAlignment": "Center",
+          "spacing": "None"
+        }
+      ]
+    },
+    {
+      "type": "Image",
+      "url": "${legendImage}",
+      "size": "Stretch",
+      "spacing": "Small",
+      "$when": "${hasData}"
+    },
+    {
+      "type": "TextBlock",
+      "text": "${totalEvaluations} evaluations \u00b7 ${lastRefresh}",
+      "size": "Small",
+      "isSubtle": true,
+      "spacing": "Small",
+      "$when": "${hasData}"
+    },
+    {
+      "type": "TextBlock",
+      "text": "No firewall activity yet\u2026",
+      "size": "Small",
+      "isSubtle": true,
+      "$when": "${!hasData}"
+    }
+  ]
+}

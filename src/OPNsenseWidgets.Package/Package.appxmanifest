@@ -138,6 +138,38 @@
                       </DarkMode>
                     </ThemeResources>
                   </Definition>
+                  <!-- Firewall Widget -->
+                  <Definition Id="Firewall_Widget"
+                              DisplayName="Firewall"
+                              Description="Shows top firewall rules by evaluations as a live donut chart"
+                              IsCustomizable="true"
+                              AllowMultiple="false">
+                    <Capabilities>
+                      <Capability>
+                        <Size Name="small" />
+                      </Capability>
+                      <Capability>
+                        <Size Name="medium" />
+                      </Capability>
+                      <Capability>
+                        <Size Name="large" />
+                      </Capability>
+                    </Capabilities>
+                    <ThemeResources>
+                      <Icons>
+                        <Icon Path="ProviderAssets\Firewall_Icon.png" />
+                      </Icons>
+                      <Screenshots>
+                        <Screenshot Path="ProviderAssets\Firewall_Screenshot.png"
+                                    DisplayAltText="Donut chart showing top firewall rules by evaluations" />
+                      </Screenshots>
+                      <DarkMode>
+                        <Icons>
+                          <Icon Path="ProviderAssets\Firewall_Icon.png" />
+                        </Icons>
+                      </DarkMode>
+                    </ThemeResources>
+                  </Definition>
                 </Definitions>
 
               </WidgetProvider>
