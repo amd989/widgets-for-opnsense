@@ -16,9 +16,9 @@ public sealed class DhcpLeasesWidget : IWidgetDefinition
 
     private static readonly Dictionary<string, int> CardsPerPage = new()
     {
-        ["small"] = 3,
+        ["small"] = 1,
         ["medium"] = 6,
-        ["large"] = 12
+        ["large"] = 10
     };
 
     public string GetTemplate(string size)
@@ -54,7 +54,7 @@ public sealed class DhcpLeasesWidget : IWidgetDefinition
 
         var showMac = size == "large";
         var columns = size == "small" ? 1 : 2;
-        var cardLogicalWidth = columns == 1 ? 150 : 160;
+        var cardLogicalWidth = size == "small" ? 280 : 160;
 
         var cardImages = displayLeases.Select(l =>
         {
@@ -65,14 +65,22 @@ public sealed class DhcpLeasesWidget : IWidgetDefinition
             if (!string.IsNullOrEmpty(vendor)) metaParts.Add(vendor);
             if (l.IsReserved == "1") metaParts.Add("rsv");
 
+            var age = now - l.EffectiveLeaseStart;
+            var status = l.IsReserved == "1" ? "reserved"
+                : age.TotalMinutes < 5 ? "new"
+                : age.TotalHours < 1 ? "active"
+                : "stale";
+
             var cardData = new DeviceCardData(
                 Hostname: hasHostname ? l.Hostname : l.Address,
                 Meta: string.Join(" \u00b7 ", metaParts),
                 Time: FormatRelativeTime(l.EffectiveLeaseStart, now),
-                Mac: showMac ? l.EffectiveMac : null
+                Mac: showMac ? l.EffectiveMac : null,
+                Status: status
             );
 
-            return new { img = DeviceCardRenderer.RenderCard(cardData, cardLogicalWidth, showMac) };
+            var compact = size == "small";
+            return new { img = DeviceCardRenderer.RenderCard(cardData, cardLogicalWidth, showMac, compact) };
         }).ToList();
 
         var pages = new List<object>();

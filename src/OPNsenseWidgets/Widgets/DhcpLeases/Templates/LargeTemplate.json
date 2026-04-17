@@ -165,14 +165,6 @@
           ]
         }
       ]
-    },
-    {
-      "type": "TextBlock",
-      "text": "${displayedLeases} of ${totalLeases} \u00b7 ${pageCount} pages",
-      "size": "Small",
-      "isSubtle": true,
-      "spacing": "Small",
-      "$when": "${totalLeases > 0}"
     }
   ]
 }

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://adaptivecards.io/schemas/adaptive-card.json",
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
   "type": "AdaptiveCard",
   "version": "1.6",
   "body": [
@@ -38,7 +38,7 @@
     },
     {
       "type": "Carousel",
-      "spacing": "Small",
+      "spacing": "None",
       "$when": "${pageCount > 0}",
       "pages": [
         {
@@ -52,9 +52,11 @@
               "size": "Stretch",
               "spacing": "Small"
             }
-          ]
+          ],
+          "rtl": false
         }
-      ]
+      ],
+      "rtl": false
     },
     {
       "type": "TextBlock",

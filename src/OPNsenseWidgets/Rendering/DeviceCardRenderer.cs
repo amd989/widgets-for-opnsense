@@ -2,20 +2,29 @@ using SkiaSharp;
 
 namespace OPNsenseWidgets.Rendering;
 
-public record DeviceCardData(string Hostname, string Meta, string Time, string? Mac);
+public record DeviceCardData(string Hostname, string Meta, string Time, string? Mac, string Status = "active");
 
 public static class DeviceCardRenderer
 {
-    public static string RenderCard(DeviceCardData d, int logicalWidth, bool showMac = false)
+    private static readonly Dictionary<string, SKColor> AccentColors = new()
+    {
+        ["new"] = new SKColor(91, 163, 255),       // blue
+        ["active"] = new SKColor(45, 212, 160),     // green
+        ["reserved"] = new SKColor(155, 135, 245),  // purple
+        ["stale"] = new SKColor(255, 255, 255, 31), // subtle gray
+    };
+
+    public static string RenderCard(DeviceCardData d, int logicalWidth, bool showMac = false, bool compact = false)
     {
         const int scale = 3;
         var width = logicalWidth * scale;
-        const int padH = 10 * scale, padV = 7 * scale;
+        var padH = (compact ? 8 : 10) * scale;
+        var padV = (compact ? 6 : 10) * scale;
         const float radius = 6f * scale;
-        const float hostTextSize = 13f * scale;
-        const float subTextSize = 11f * scale;
-        const float macTextSize = 10f * scale;
-        const int lineGap = 2 * scale;
+        var hostTextSize = (compact ? 12f : 15f) * scale;
+        var subTextSize = (compact ? 10f : 13f) * scale;
+        var macTextSize = (compact ? 9f : 11f) * scale;
+        var lineGap = (compact ? 2 : 4) * scale;
 
         var hasMeta = !string.IsNullOrEmpty(d.Meta);
         var hasMac = showMac && !string.IsNullOrEmpty(d.Mac);
@@ -35,6 +44,20 @@ public static class DeviceCardRenderer
             Color = new SKColor(255, 255, 255, 22)
         };
         canvas.DrawRoundRect(new SKRect(0, 0, width, height), radius, radius, bg);
+
+        // Status accent bar (left edge)
+        const float barWidth = 2.5f * scale;
+        const float barInset = 6f * scale;
+        const float barRadius = 1.5f * scale;
+        var accentColor = AccentColors.GetValueOrDefault(d.Status, AccentColors["stale"]);
+        using var barPaint = new SKPaint
+        {
+            IsAntialias = true,
+            Style = SKPaintStyle.Fill,
+            Color = accentColor
+        };
+        var barRect = new SKRect(0, barInset, barWidth, height - barInset);
+        canvas.DrawRoundRect(barRect, barRadius, barRadius, barPaint);
 
         using var hostPaint = new SKPaint
         {
