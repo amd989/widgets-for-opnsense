@@ -1,7 +1,9 @@
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using OPNsenseWidgets.Api;
 using OPNsenseWidgets.Configuration;
+using OPNsenseWidgets.Logging;
 using OPNsenseWidgets.Provider;
 using OPNsenseWidgets.Refresh;
 using OPNsenseWidgets.Widgets;
@@ -14,6 +16,10 @@ namespace OPNsenseWidgets;
 internal class Program
 {
     private static readonly Guid ProviderClsid = Guid.Parse("D40B2E99-B044-4758-9AB5-212C01B368EE");
+
+    private static readonly string LogPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+        "opnsense-widget-debug.log");
 
     [DllImport("ole32.dll")]
     private static extern int CoRegisterClassObject(
@@ -31,12 +37,18 @@ internal class Program
 
     static void Main(string[] args)
     {
-        OPNsenseWidgetProvider.Log($"Main started, args=[{string.Join(", ", args)}]");
-
-        WinRT.ComWrappersSupport.InitializeComWrappers();
-        OPNsenseWidgetProvider.Log("InitializeComWrappers done");
-
         var services = new ServiceCollection();
+
+        // Logging
+        services.AddLogging(builder =>
+        {
+            builder.AddSimpleConsole(options =>
+            {
+                options.SingleLine = true;
+                options.TimestampFormat = "HH:mm:ss.fff ";
+            });
+            builder.AddProvider(new FileLoggerProvider(LogPath));
+        });
 
         // Configuration
         services.AddSingleton<ISettingsManager, SettingsManager>();
@@ -57,6 +69,13 @@ internal class Program
 
         using var serviceProvider = services.BuildServiceProvider();
 
+        var logger = serviceProvider.GetRequiredService<ILogger<Program>>();
+
+        logger.LogInformation("Main started, args=[{Args}]", string.Join(", ", args));
+
+        WinRT.ComWrappersSupport.InitializeComWrappers();
+        logger.LogInformation("InitializeComWrappers done");
+
         var provider = serviceProvider.GetRequiredService<OPNsenseWidgetProvider>();
         var factory = serviceProvider.GetRequiredService<WidgetProviderFactory>();
 
@@ -67,11 +86,11 @@ internal class Program
             REGCLS_MULTIPLEUSE,
             out var cookie);
 
-        OPNsenseWidgetProvider.Log($"CoRegisterClassObject hr=0x{hr:X8} cookie={cookie}");
+        logger.LogInformation("CoRegisterClassObject hr=0x{Hr:X8} cookie={Cookie}", hr, cookie);
 
         if (hr != 0)
         {
-            Console.Error.WriteLine($"Failed to register COM class object: 0x{hr:X8}");
+            logger.LogError("Failed to register COM class object: 0x{Hr:X8}", hr);
             return;
         }
 
@@ -80,10 +99,10 @@ internal class Program
         var refreshService = serviceProvider.GetRequiredService<RefreshService>();
         refreshService.Start();
 
-        OPNsenseWidgetProvider.Log("Waiting for EmptyEvent...");
+        logger.LogInformation("Waiting for EmptyEvent...");
         provider.EmptyEvent.Wait();
 
-        OPNsenseWidgetProvider.Log("EmptyEvent fired, shutting down");
+        logger.LogInformation("EmptyEvent fired, shutting down");
         refreshService.Stop();
         CoRevokeClassObject(cookie);
     }

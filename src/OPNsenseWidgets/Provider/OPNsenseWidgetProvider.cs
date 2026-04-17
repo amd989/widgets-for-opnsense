@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using Microsoft.Windows.Widgets.Providers;
 using OPNsenseWidgets.Api;
 using OPNsenseWidgets.Configuration;
@@ -15,11 +16,7 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
     private readonly ISettingsManager _settingsManager;
     private readonly ICredentialStore _credentialStore;
     private readonly IOPNsenseApiClientFactory _apiClientFactory;
-
-    // Desktop is always writable for full-trust packaged apps
-    private static readonly string LogPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-        "opnsense-widget-debug.log");
+    private readonly ILogger<OPNsenseWidgetProvider> _logger;
 
     public ManualResetEventSlim EmptyEvent { get; } = new(false);
 
@@ -27,27 +24,17 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
         IEnumerable<IWidgetDefinition> widgetDefinitions,
         ISettingsManager settingsManager,
         ICredentialStore credentialStore,
-        IOPNsenseApiClientFactory apiClientFactory)
+        IOPNsenseApiClientFactory apiClientFactory,
+        ILogger<OPNsenseWidgetProvider> logger)
     {
         _settingsManager = settingsManager;
         _credentialStore = credentialStore;
         _apiClientFactory = apiClientFactory;
+        _logger = logger;
 
-        Log("Provider constructed");
+        _logger.LogInformation("Provider constructed");
         foreach (var definition in widgetDefinitions)
             RegisterDefinition(definition);
-    }
-
-    internal static void Log(string message)
-    {
-        var line = $"{DateTime.Now:HH:mm:ss.fff} {message}";
-        // Console output appears in VS Output window when debugging
-        Console.Error.WriteLine($"[OPNsense] {line}");
-        try
-        {
-            File.AppendAllText(LogPath, line + Environment.NewLine);
-        }
-        catch { }
     }
 
     public void RegisterDefinition(IWidgetDefinition definition)
@@ -64,7 +51,7 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
 
     public void CreateWidget(WidgetContext widgetContext)
     {
-        Log($"CreateWidget: id={widgetContext.Id} defId={widgetContext.DefinitionId}");
+        _logger.LogInformation("CreateWidget: id={WidgetId} defId={DefinitionId}", widgetContext.Id, widgetContext.DefinitionId);
         try
         {
             var info = new WidgetInfo
@@ -84,13 +71,13 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
         }
         catch (Exception ex)
         {
-            Log($"CreateWidget EXCEPTION: {ex}");
+            _logger.LogError(ex, "CreateWidget failed");
         }
     }
 
     public void DeleteWidget(string widgetId, string customState)
     {
-        Log($"DeleteWidget: id={widgetId}");
+        _logger.LogInformation("DeleteWidget: id={WidgetId}", widgetId);
         lock (_lock)
         {
             _runningWidgets.Remove(widgetId);
@@ -101,7 +88,7 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
 
     public void OnActionInvoked(WidgetActionInvokedArgs actionInvokedArgs)
     {
-        Log($"OnActionInvoked: verb={actionInvokedArgs.Verb} id={actionInvokedArgs.WidgetContext.Id}");
+        _logger.LogInformation("OnActionInvoked: verb={Verb} id={WidgetId}", actionInvokedArgs.Verb, actionInvokedArgs.WidgetContext.Id);
         try
         {
             var widgetId = actionInvokedArgs.WidgetContext.Id;
@@ -139,13 +126,13 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
         }
         catch (Exception ex)
         {
-            Log($"OnActionInvoked EXCEPTION: {ex}");
+            _logger.LogError(ex, "OnActionInvoked failed");
         }
     }
 
     public void OnWidgetContextChanged(WidgetContextChangedArgs contextChangedArgs)
     {
-        Log($"OnWidgetContextChanged: id={contextChangedArgs.WidgetContext.Id} size={contextChangedArgs.WidgetContext.Size}");
+        _logger.LogInformation("OnWidgetContextChanged: id={WidgetId} size={Size}", contextChangedArgs.WidgetContext.Id, contextChangedArgs.WidgetContext.Size);
         try
         {
             var widgetId = contextChangedArgs.WidgetContext.Id;
@@ -161,13 +148,13 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
         }
         catch (Exception ex)
         {
-            Log($"OnWidgetContextChanged EXCEPTION: {ex}");
+            _logger.LogError(ex, "OnWidgetContextChanged failed");
         }
     }
 
     public void Activate(WidgetContext widgetContext)
     {
-        Log($"Activate: id={widgetContext.Id} size={widgetContext.Size}");
+        _logger.LogInformation("Activate: id={WidgetId} size={Size}", widgetContext.Id, widgetContext.Size);
         try
         {
             WidgetInfo? info;
@@ -183,13 +170,13 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
         }
         catch (Exception ex)
         {
-            Log($"Activate EXCEPTION: {ex}");
+            _logger.LogError(ex, "Activate failed");
         }
     }
 
     public void Deactivate(string widgetId)
     {
-        Log($"Deactivate: id={widgetId}");
+        _logger.LogInformation("Deactivate: id={WidgetId}", widgetId);
         lock (_lock)
         {
             if (_runningWidgets.TryGetValue(widgetId, out var info))
@@ -199,7 +186,7 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
 
     public void OnCustomizationRequested(WidgetCustomizationRequestedArgs customizationRequestedArgs)
     {
-        Log($"OnCustomizationRequested: id={customizationRequestedArgs.WidgetContext.Id}");
+        _logger.LogInformation("OnCustomizationRequested: id={WidgetId}", customizationRequestedArgs.WidgetContext.Id);
         try
         {
             var widgetId = customizationRequestedArgs.WidgetContext.Id;
@@ -215,17 +202,17 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
         }
         catch (Exception ex)
         {
-            Log($"OnCustomizationRequested EXCEPTION: {ex}");
+            _logger.LogError(ex, "OnCustomizationRequested failed");
         }
     }
 
     public void RecoverRunningWidgets()
     {
-        Log("RecoverRunningWidgets called");
+        _logger.LogInformation("RecoverRunningWidgets called");
         var widgetManager = WidgetManager.GetDefault();
         var existingWidgets = widgetManager.GetWidgetInfos();
 
-        Log($"RecoverRunningWidgets: found {existingWidgets?.Length ?? 0} existing widgets");
+        _logger.LogInformation("RecoverRunningWidgets: found {Count} existing widgets", existingWidgets?.Length ?? 0);
 
         if (existingWidgets is null || existingWidgets.Length == 0)
             return;
@@ -236,7 +223,7 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
             {
                 if (!_runningWidgets.ContainsKey(existing.WidgetContext.Id))
                 {
-                    Log($"RecoverRunningWidgets: recovering id={existing.WidgetContext.Id} defId={existing.WidgetContext.DefinitionId}");
+                    _logger.LogInformation("RecoverRunningWidgets: recovering id={WidgetId} defId={DefinitionId}", existing.WidgetContext.Id, existing.WidgetContext.DefinitionId);
                     var info = new WidgetInfo
                     {
                         WidgetId = existing.WidgetContext.Id,
@@ -252,7 +239,7 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
 
     public void UpdateWidget(WidgetInfo info)
     {
-        Log($"UpdateWidget: id={info.WidgetId} defId={info.DefinitionId} size={info.CurrentSize}");
+        _logger.LogDebug("UpdateWidget: id={WidgetId} defId={DefinitionId} size={Size}", info.WidgetId, info.DefinitionId, info.CurrentSize);
         try
         {
             var settings = _settingsManager.Load();
@@ -268,29 +255,29 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
             }
             else if (!settings.IsConfigured || credentials is null)
             {
-                Log("UpdateWidget: using UnconfiguredTemplate");
+                _logger.LogDebug("UpdateWidget: using UnconfiguredTemplate");
                 template = TemplateHelper.LoadSharedTemplate("UnconfiguredTemplate.json");
                 data = "{}";
             }
             else if (info.LastError is not null)
             {
-                Log($"UpdateWidget: using ErrorTemplate, error={info.LastError}");
+                _logger.LogDebug("UpdateWidget: using ErrorTemplate, error={Error}", info.LastError);
                 template = TemplateHelper.LoadSharedTemplate("ErrorTemplate.json");
                 data = JsonSerializer.Serialize(new { errorMessage = info.LastError });
             }
             else if (_definitions.TryGetValue(info.DefinitionId, out var definition))
             {
-                Log($"UpdateWidget: using data template for size={info.CurrentSize}");
+                _logger.LogDebug("UpdateWidget: using data template for size={Size}", info.CurrentSize);
                 template = definition.GetTemplate(info.CurrentSize);
                 data = definition.BuildDataJson(info.CachedData, info.CurrentSize);
             }
             else
             {
-                Log($"UpdateWidget: no definition found for {info.DefinitionId}");
+                _logger.LogWarning("UpdateWidget: no definition found for {DefinitionId}", info.DefinitionId);
                 return;
             }
 
-            Log($"UpdateWidget: template length={template.Length} data length={data.Length}");
+            _logger.LogDebug("UpdateWidget: template length={TemplateLength} data length={DataLength}", template.Length, data.Length);
 
             var updateOptions = new WidgetUpdateRequestOptions(info.WidgetId)
             {
@@ -299,19 +286,19 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
                 CustomState = info.CustomState
             };
 
-            Log("UpdateWidget: calling WidgetManager.UpdateWidget");
+            _logger.LogDebug("UpdateWidget: calling WidgetManager.UpdateWidget");
             WidgetManager.GetDefault().UpdateWidget(updateOptions);
-            Log("UpdateWidget: WidgetManager.UpdateWidget succeeded");
+            _logger.LogDebug("UpdateWidget: WidgetManager.UpdateWidget succeeded");
         }
         catch (Exception ex)
         {
-            Log($"UpdateWidget EXCEPTION: {ex}");
+            _logger.LogError(ex, "UpdateWidget failed");
         }
     }
 
     private void UpdateWidgetWithConfigTemplate(WidgetInfo info)
     {
-        Log($"UpdateWidgetWithConfigTemplate: id={info.WidgetId}");
+        _logger.LogDebug("UpdateWidgetWithConfigTemplate: id={WidgetId}", info.WidgetId);
         try
         {
             var settings = _settingsManager.Load();
@@ -337,11 +324,11 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
             };
 
             WidgetManager.GetDefault().UpdateWidget(updateOptions);
-            Log("UpdateWidgetWithConfigTemplate: succeeded");
+            _logger.LogDebug("UpdateWidgetWithConfigTemplate: succeeded");
         }
         catch (Exception ex)
         {
-            Log($"UpdateWidgetWithConfigTemplate EXCEPTION: {ex}");
+            _logger.LogError(ex, "UpdateWidgetWithConfigTemplate failed");
         }
     }
 
@@ -369,17 +356,17 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
             settings.RefreshIntervalSeconds = refreshInterval;
             _settingsManager.Save(settings);
 
-            Log($"SaveConfiguration: saved host={hostUrl} allowSelfSigned={allowSelfSigned} interval={refreshInterval}");
+            _logger.LogInformation("SaveConfiguration: saved host={HostUrl} allowSelfSigned={AllowSelfSigned} interval={Interval}", hostUrl, allowSelfSigned, refreshInterval);
         }
         catch (Exception ex)
         {
-            Log($"SaveConfiguration EXCEPTION: {ex}");
+            _logger.LogError(ex, "SaveConfiguration failed");
         }
     }
 
     public async Task RefreshWidgetAsync(WidgetInfo info)
     {
-        Log($"RefreshWidgetAsync: id={info.WidgetId}");
+        _logger.LogDebug("RefreshWidgetAsync: id={WidgetId}", info.WidgetId);
         if (!_definitions.TryGetValue(info.DefinitionId, out var definition))
             return;
 
@@ -398,12 +385,12 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
             info.CachedData = data;
             info.LastError = null;
             info.LastRefresh = DateTime.Now;
-            Log($"RefreshWidgetAsync: fetch succeeded");
+            _logger.LogDebug("RefreshWidgetAsync: fetch succeeded");
         }
         catch (Exception ex)
         {
             info.LastError = ex.Message;
-            Log($"RefreshWidgetAsync EXCEPTION: {ex}");
+            _logger.LogError(ex, "RefreshWidgetAsync failed");
         }
 
         UpdateWidget(info);
@@ -411,7 +398,7 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
 
     private async Task TestConnectionAsync(WidgetInfo info)
     {
-        Log("TestConnectionAsync called");
+        _logger.LogInformation("TestConnectionAsync called");
 
         using var client = _apiClientFactory.Create();
         if (client is null)
@@ -434,12 +421,12 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
                 info.LastRefresh = DateTime.Now;
             }
 
-            Log("TestConnectionAsync: connection OK");
+            _logger.LogInformation("TestConnectionAsync: connection OK");
         }
         catch (Exception ex)
         {
             info.TestResult = $"Failed: {ex.Message}";
-            Log($"TestConnectionAsync EXCEPTION: {ex}");
+            _logger.LogError(ex, "TestConnectionAsync failed");
         }
 
         UpdateWidgetWithConfigTemplate(info);
@@ -460,11 +447,11 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
 
     private void ImportKeyFile(WidgetInfo info)
     {
-        Log("ImportKeyFile called");
+        _logger.LogInformation("ImportKeyFile called");
         try
         {
             var downloadsPath = GetDownloadsPath();
-            Log($"ImportKeyFile: scanning {downloadsPath}");
+            _logger.LogInformation("ImportKeyFile: scanning {DownloadsPath}", downloadsPath);
 
             var keyFiles = Directory.GetFiles(downloadsPath, "*_apikey.txt");
             if (keyFiles.Length == 0)
@@ -476,7 +463,7 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
 
             // Pick the most recently modified file
             var newest = keyFiles.OrderByDescending(File.GetLastWriteTime).First();
-            Log($"ImportKeyFile: parsing {newest}");
+            _logger.LogInformation("ImportKeyFile: parsing {FileName}", newest);
 
             string? apiKey = null, apiSecret = null;
             foreach (var line in File.ReadAllLines(newest))
@@ -496,12 +483,12 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
 
             _credentialStore.SaveCredentials(apiKey, apiSecret);
             info.TestResult = $"Imported from {Path.GetFileName(newest)}";
-            Log($"ImportKeyFile: imported from {Path.GetFileName(newest)}");
+            _logger.LogInformation("ImportKeyFile: imported from {FileName}", Path.GetFileName(newest));
         }
         catch (Exception ex)
         {
             info.TestResult = $"Import failed: {ex.Message}";
-            Log($"ImportKeyFile EXCEPTION: {ex}");
+            _logger.LogError(ex, "ImportKeyFile failed");
         }
 
         UpdateWidgetWithConfigTemplate(info);

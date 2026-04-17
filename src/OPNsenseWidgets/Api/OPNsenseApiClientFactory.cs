@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using OPNsenseWidgets.Configuration;
 
 namespace OPNsenseWidgets.Api;
@@ -6,11 +7,13 @@ public sealed class OPNsenseApiClientFactory : IOPNsenseApiClientFactory
 {
     private readonly ISettingsManager _settingsManager;
     private readonly ICredentialStore _credentialStore;
+    private readonly ILogger<OPNsenseApiClient> _logger;
 
-    public OPNsenseApiClientFactory(ISettingsManager settingsManager, ICredentialStore credentialStore)
+    public OPNsenseApiClientFactory(ISettingsManager settingsManager, ICredentialStore credentialStore, ILogger<OPNsenseApiClient> logger)
     {
         _settingsManager = settingsManager;
         _credentialStore = credentialStore;
+        _logger = logger;
     }
 
     public OPNsenseApiClient? Create()
@@ -25,6 +28,7 @@ public sealed class OPNsenseApiClientFactory : IOPNsenseApiClientFactory
             settings.HostUrl,
             credentials.Value.ApiKey,
             credentials.Value.ApiSecret,
-            settings.AllowSelfSignedCertificates);
+            settings.AllowSelfSignedCertificates,
+            _logger);
     }
 }

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using OPNsenseWidgets.Api.Models;
 
 namespace OPNsenseWidgets.Api;
@@ -10,6 +11,7 @@ public sealed class OPNsenseApiClient : IDisposable
 {
     private readonly HttpClient _httpClient;
     private readonly string _baseUrl;
+    private readonly ILogger<OPNsenseApiClient> _logger;
 
     private static readonly string[] LeaseEndpoints =
     [
@@ -17,9 +19,10 @@ public sealed class OPNsenseApiClient : IDisposable
         "/api/kea/leases4/search"
     ];
 
-    public OPNsenseApiClient(string baseUrl, string apiKey, string apiSecret, bool allowSelfSigned = true)
+    public OPNsenseApiClient(string baseUrl, string apiKey, string apiSecret, bool allowSelfSigned, ILogger<OPNsenseApiClient> logger)
     {
         _baseUrl = baseUrl.TrimEnd('/');
+        _logger = logger;
 
         var handler = new HttpClientHandler();
         if (allowSelfSigned)
@@ -69,15 +72,15 @@ public sealed class OPNsenseApiClient : IDisposable
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync(ct);
-                Provider.OPNsenseWidgetProvider.Log($"GetLeasesAsync: endpoint={endpoint} status={response.StatusCode} bodyLength={json.Length}");
-                Provider.OPNsenseWidgetProvider.Log($"GetLeasesAsync: body preview={json[..Math.Min(500, json.Length)]}");
+                _logger.LogDebug("GetLeasesAsync: endpoint={Endpoint} status={StatusCode} bodyLength={BodyLength}", endpoint, response.StatusCode, json.Length);
+                _logger.LogDebug("GetLeasesAsync: body preview={BodyPreview}", json[..Math.Min(500, json.Length)]);
                 var result = JsonSerializer.Deserialize<LeaseSearchResponse>(json);
-                Provider.OPNsenseWidgetProvider.Log($"GetLeasesAsync: deserialized total={result?.Total} rowCount={result?.RowCount} rows={result?.Rows?.Count}");
+                _logger.LogDebug("GetLeasesAsync: deserialized total={Total} rowCount={RowCount} rows={Rows}", result?.Total, result?.RowCount, result?.Rows?.Count);
 
                 // If this endpoint returned empty rows, try the next one (ISC disabled → try KEA)
                 if ((result?.Rows?.Count ?? 0) == 0)
                 {
-                    Provider.OPNsenseWidgetProvider.Log($"GetLeasesAsync: 0 rows from {endpoint}, trying next");
+                    _logger.LogDebug("GetLeasesAsync: 0 rows from {Endpoint}, trying next", endpoint);
                     lastException = new HttpRequestException($"No leases from {endpoint}");
                     continue;
                 }
@@ -136,10 +139,8 @@ public sealed class OPNsenseApiClient : IDisposable
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            Provider.OPNsenseWidgetProvider.Log(
-                $"GetInterfaceStatisticsAsync: bodyLength={json.Length}");
-            Provider.OPNsenseWidgetProvider.Log(
-                $"GetInterfaceStatisticsAsync: body preview={json[..Math.Min(800, json.Length)]}");
+            _logger.LogDebug("GetInterfaceStatisticsAsync: bodyLength={BodyLength}", json.Length);
+            _logger.LogDebug("GetInterfaceStatisticsAsync: body preview={BodyPreview}", json[..Math.Min(800, json.Length)]);
 
             using var doc = JsonDocument.Parse(json);
 
@@ -176,8 +177,7 @@ public sealed class OPNsenseApiClient : IDisposable
 
             foreach (var kv in result)
             {
-                Provider.OPNsenseWidgetProvider.Log(
-                    $"  iface={kv.Key} name='{kv.Value.Name}' in={kv.Value.BytesReceived} out={kv.Value.BytesTransmitted}");
+                _logger.LogDebug("  iface={DeviceName} name='{Name}' in={BytesReceived} out={BytesTransmitted}", kv.Key, kv.Value.Name, kv.Value.BytesReceived, kv.Value.BytesTransmitted);
             }
 
             return result;
@@ -233,14 +233,12 @@ public sealed class OPNsenseApiClient : IDisposable
                 }
             }
 
-            Provider.OPNsenseWidgetProvider.Log(
-                $"GetFirewallRuleDescriptionsAsync: {map.Count} named rules");
+            _logger.LogDebug("GetFirewallRuleDescriptionsAsync: {Count} named rules", map.Count);
             return map;
         }
         catch (Exception ex)
         {
-            Provider.OPNsenseWidgetProvider.Log(
-                $"GetFirewallRuleDescriptionsAsync EXCEPTION: {ex.Message}");
+            _logger.LogError(ex, "GetFirewallRuleDescriptionsAsync failed");
             return [];
         }
     }
@@ -291,10 +289,8 @@ public sealed class OPNsenseApiClient : IDisposable
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync(ct);
-                Provider.OPNsenseWidgetProvider.Log(
-                    $"GetFirewallRuleStatsAsync: endpoint={endpoint} bodyLength={json.Length}");
-                Provider.OPNsenseWidgetProvider.Log(
-                    $"GetFirewallRuleStatsAsync: body preview={json[..Math.Min(600, json.Length)]}");
+                _logger.LogDebug("GetFirewallRuleStatsAsync: endpoint={Endpoint} bodyLength={BodyLength}", endpoint, json.Length);
+                _logger.LogDebug("GetFirewallRuleStatsAsync: body preview={BodyPreview}", json[..Math.Min(600, json.Length)]);
 
                 using var doc = JsonDocument.Parse(json);
                 var rules = ParseFirewallRules(doc.RootElement);

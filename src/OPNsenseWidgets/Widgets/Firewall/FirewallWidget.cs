@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using OPNsenseWidgets.Api;
 using OPNsenseWidgets.Api.Models;
 using OPNsenseWidgets.Provider;
@@ -8,6 +9,13 @@ namespace OPNsenseWidgets.Widgets.Firewall;
 
 public sealed class FirewallWidget : IWidgetDefinition
 {
+    private readonly ILogger<FirewallWidget> _logger;
+
+    public FirewallWidget(ILogger<FirewallWidget> logger)
+    {
+        _logger = logger;
+    }
+
     public string DefinitionId => "Firewall_Widget";
     public string DisplayName => "Firewall";
     public int RefreshIntervalSeconds => 1;
@@ -51,12 +59,11 @@ public sealed class FirewallWidget : IWidgetDefinition
                 _trackedDevices = ifaces.Keys
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
                 _devicesFetchedAt = DateTime.Now;
-                OPNsenseWidgetProvider.Log(
-                    $"FirewallWidget: tracked devices={string.Join(",", _trackedDevices)}");
+                _logger.LogDebug("FirewallWidget: tracked devices={TrackedDevices}", string.Join(",", _trackedDevices));
             }
             catch (Exception ex)
             {
-                OPNsenseWidgetProvider.Log($"FirewallWidget: interface fetch failed: {ex.Message}");
+                _logger.LogError(ex, "FirewallWidget: interface fetch failed");
             }
         }
 
