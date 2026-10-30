@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using OPNsenseWidgets.Api.Models;
 
@@ -41,6 +42,13 @@ public sealed class OPNsenseApiClient : IDisposable
             new AuthenticationHeaderValue("Basic", credentials);
     }
 
+    // OPNsense field types drift between versions (strings vs numbers), so read leniently
+    private static readonly JsonSerializerOptions LenientJsonOptions = new()
+    {
+        NumberHandling = JsonNumberHandling.AllowReadingFromString,
+        Converters = { new LenientStringConverter() }
+    };
+
     public async Task<LeaseSearchResponse> GetLeasesAsync(
         int page = 1,
         int rowCount = 50,
@@ -74,7 +82,7 @@ public sealed class OPNsenseApiClient : IDisposable
                 var json = await response.Content.ReadAsStringAsync(ct);
                 _logger.LogDebug("GetLeasesAsync: endpoint={Endpoint} status={StatusCode} bodyLength={BodyLength}", endpoint, response.StatusCode, json.Length);
                 _logger.LogDebug("GetLeasesAsync: body preview={BodyPreview}", json[..Math.Min(500, json.Length)]);
-                var result = JsonSerializer.Deserialize<LeaseSearchResponse>(json);
+                var result = JsonSerializer.Deserialize<LeaseSearchResponse>(json, LenientJsonOptions);
                 _logger.LogDebug("GetLeasesAsync: deserialized total={Total} rowCount={RowCount} rows={Rows}", result?.Total, result?.RowCount, result?.Rows?.Count);
 
                 // If this endpoint returned empty rows, try the next one (ISC disabled → try KEA)
