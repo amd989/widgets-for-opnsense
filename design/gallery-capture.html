@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gallery Capture</title>
+<!--
+  One widget in a Widget Board frame, sized to the viewport. Used to render the widget picker
+  screenshots in OPNsenseWidgets.Package/ProviderAssets (see design/capture-gallery.ps1).
+  Query: ?widget=DhcpLeases&title=DHCP%20Leases&size=medium
+-->
+<style>
+  :root { --tile: #202020; --text-1: #ffffff; --text-2: rgba(255, 255, 255, 0.78); }
+  @media (prefers-color-scheme: light) {
+    :root { --tile: #fbfbfb; --text-1: #1a1a1a; --text-2: rgba(0, 0, 0, 0.62); }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  /* Headless Edge clamps narrow windows, so the tile is pinned top-left at a fixed size and cropped. */
+  html, body { overflow: hidden; background: var(--tile); }
+  body { position: relative; width: var(--w, 300px); height: var(--h, 304px); color: var(--text-1); font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+  iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; }
+  .titlebar {
+    position: absolute; top: 0; left: 0; right: 0; height: 44px; z-index: 1;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 14px 0 16px; pointer-events: none; font-size: 14px;
+  }
+  .name { display: flex; align-items: center; gap: 10px; }
+  .name img { width: 16px; height: 16px; }
+  .more { font-size: 16px; font-weight: 700; letter-spacing: 1px; color: var(--text-2); }
+</style>
+</head>
+<body>
+  <div class="titlebar">
+    <span class="name"><img src="../src/OPNsenseWidgets.Package/ProviderAssets/ProviderIcon.png" alt=""><span id="title"></span></span>
+    <span class="more">&middot;&middot;&middot;</span>
+  </div>
+  <iframe id="page" title="widget"></iframe>
+  <script>
+    const q = new URLSearchParams(location.search);
+    const widget = q.get("widget") || "DhcpLeases";
+    document.body.style.setProperty("--w", (q.get("w") || 300) + "px");
+    document.body.style.setProperty("--h", (q.get("h") || 304) + "px");
+    document.getElementById("title").textContent = q.get("title") || widget;
+    document.getElementById("page").src =
+      `../src/OPNsenseWidgets/Widgets/${widget}/Web/index.html?size=${q.get("size") || "medium"}`;
+  </script>
+</body>
+</html>

@@ -103,6 +103,10 @@
                         <Icons>
                           <Icon Path="ProviderAssets\DhcpLeases_Icon.png" />
                         </Icons>
+                        <Screenshots>
+                          <Screenshot Path="ProviderAssets\DhcpLeases_Screenshot_Dark.png"
+                                      DisplayAltText="DHCP lease list showing connected devices" />
+                        </Screenshots>
                       </DarkMode>
                     </ThemeResources>
                   </Definition>
@@ -137,6 +141,10 @@
                         <Icons>
                           <Icon Path="ProviderAssets\Traffic_Icon.png" />
                         </Icons>
+                        <Screenshots>
+                          <Screenshot Path="ProviderAssets\Traffic_Screenshot_Dark.png"
+                                      DisplayAltText="Network traffic chart showing download and upload speeds" />
+                        </Screenshots>
                       </DarkMode>
                     </ThemeResources>
                   </Definition>
@@ -170,6 +178,10 @@
                         <Icons>
                           <Icon Path="ProviderAssets\Firewall_Icon.png" />
                         </Icons>
+                        <Screenshots>
+                          <Screenshot Path="ProviderAssets\Firewall_Screenshot_Dark.png"
+                                      DisplayAltText="Donut chart showing top firewall rules by evaluations" />
+                        </Screenshots>
                       </DarkMode>
                     </ThemeResources>
                   </Definition>
