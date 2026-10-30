@@ -58,6 +58,7 @@ internal class Program
         services.AddSingleton<IOPNsenseApiClientFactory, OPNsenseApiClientFactory>();
 
         // Widget definitions
+        services.AddSingleton<FirstSeenStore>();
         services.AddSingleton<IWidgetDefinition, DhcpLeasesWidget>();
         services.AddSingleton<IWidgetDefinition, TrafficWidget>();
         services.AddSingleton<IWidgetDefinition, FirewallWidget>();

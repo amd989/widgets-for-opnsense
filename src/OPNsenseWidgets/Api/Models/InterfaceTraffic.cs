@@ -28,4 +28,6 @@ public sealed class TrafficData
     public Dictionary<string, List<TrafficSample>> AllHistory { get; init; } = [];
     // Friendly display names keyed by device name
     public Dictionary<string, string> InterfaceNames { get; init; } = [];
+    // Byte counters since boot keyed by device name
+    public Dictionary<string, (long BytesIn, long BytesOut)> Totals { get; init; } = [];
 }

@@ -128,6 +128,61 @@ public sealed class OPNsenseApiClient : IDisposable
             lastException);
     }
 
+    // KEA keeps reservations in its own settings; the lease list doesn't flag them.
+    // Older routes are camelCase, newer OPNsense also accepts snake_case.
+    private static readonly string[] ReservationEndpoints =
+    [
+        "/api/kea/dhcpv4/searchReservation",
+        "/api/kea/dhcpv4/search_reservation"
+    ];
+
+    /// <summary>
+    /// KEA DHCPv4 reservations as lower-case MAC addresses and IPs. Returns empty sets when KEA isn't
+    /// used or the API user lacks the privilege; reservations are a nice-to-have, never an error.
+    /// </summary>
+    public async Task<(HashSet<string> Macs, HashSet<string> Ips)> GetReservationsAsync(CancellationToken ct = default)
+    {
+        var macs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var ips = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var endpoint in ReservationEndpoints)
+        {
+            try
+            {
+                using var response = await _httpClient.GetAsync($"{_baseUrl}{endpoint}?current=1&rowCount=-1", ct);
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                    continue;
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("GetReservationsAsync: {Endpoint} returned {StatusCode}", endpoint, (int)response.StatusCode);
+                    break;
+                }
+
+                var json = await response.Content.ReadAsStringAsync(ct);
+                using var doc = JsonDocument.Parse(json);
+                if (!doc.RootElement.TryGetProperty("rows", out var rows) || rows.ValueKind != JsonValueKind.Array)
+                    continue;
+
+                foreach (var row in rows.EnumerateArray())
+                {
+                    var mac = GetJsonString(row, "hw_address");
+                    var ip = GetJsonString(row, "ip_address");
+                    if (!string.IsNullOrWhiteSpace(mac)) macs.Add(mac.Trim().Replace('-', ':'));
+                    if (!string.IsNullOrWhiteSpace(ip)) ips.Add(ip.Trim());
+                }
+
+                _logger.LogDebug("GetReservationsAsync: {Count} reservations from {Endpoint}", rows.GetArrayLength(), endpoint);
+                break;
+            }
+            catch (Exception ex) when (ex is HttpRequestException or JsonException or TaskCanceledException && !ct.IsCancellationRequested)
+            {
+                _logger.LogInformation("GetReservationsAsync: {Endpoint} failed: {Message}", endpoint, ex.Message);
+            }
+        }
+
+        return (macs, ips);
+    }
+
     public async Task<Dictionary<string, InterfaceStats>> GetInterfaceStatisticsAsync(
         CancellationToken ct = default)
     {

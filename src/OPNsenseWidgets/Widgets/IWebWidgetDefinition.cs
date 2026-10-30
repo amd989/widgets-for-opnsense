@@ -6,7 +6,7 @@ namespace OPNsenseWidgets.Widgets;
 /// </summary>
 public interface IWebWidgetDefinition : IWidgetDefinition
 {
-    /// <summary>Page path under the packaged origin, e.g. "DhcpLeases/index.html".</summary>
+    /// <summary>Page path under the packaged origin, e.g. "DhcpLeases/Web/index.html".</summary>
     string WebPath { get; }
 
     /// <summary>Data pushed to the page as the "payload" of a "data" message.</summary>

@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Firewall</title>
+<!--
+  Firewall widget page (redesign v3, see design/widget-mockup-v3.html). Updates every second.
+  Payload (FirewallWidget.BuildWebData):
+    {updatedAt, ruleCount, rate, rateHistory:[[unixMs, evalsPerSecond], ...],
+     totals:{evaluations, packets, bytes, states},
+     rules:[{label, evaluations, packets, bytes, states, rate}]}   (sorted by evaluations)
+  Counters are cumulative since the last pf reset. The donut shows each rule's share of all
+  evaluations. Rates (null until known) and their 60 s history are computed by the app, so they
+  are already there when the board reopens and reloads this page.
+  Shared protocol, theme and helpers: ../../Shared/Web/widget.{css,js}.
+-->
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../../Shared/Web/widget.css">
+<style>
+  /* ─── Top: live rate on the left, 60s rate chart on the right ─── */
+  .top { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; flex-shrink: 0; }
+  .summary { flex-shrink: 0; }
+  .activity { flex: 0 1 116px; min-width: 64px; }
+  .activity svg { width: 100%; height: 26px; }
+  .rate-area { fill: url(#grad-rate); }
+  .rate-line { fill: none; stroke: var(--green); stroke-width: 1.4; stroke-linejoin: round; }
+  .rate-base { stroke: var(--grid); stroke-width: 1; }
+
+  /* ─── Share: donut + legend ─── */
+  .share { flex: 1; min-height: 0; display: flex; align-items: center; gap: 14px; }
+  .donut { position: relative; height: 100%; max-height: 124px; aspect-ratio: 1; flex-shrink: 0; }
+  .donut svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .donut .track-ring { fill: none; stroke: var(--grid); }
+  .donut .slice { fill: none; transition: opacity 0.2s, stroke-width 0.2s; }
+  .donut.focus .slice { opacity: 0.25; }
+  .donut.focus .slice.on { opacity: 1; }
+  .donut-center {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  .donut-value { font-size: 18px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .donut-caption { font-size: 8px; color: var(--text-3); letter-spacing: 0.08em; text-transform: uppercase; margin-top: 3px; }
+
+  .legend { flex: 1; min-width: 0; height: 100%; list-style: none; display: flex; flex-direction: column; justify-content: center; gap: 2px; overflow: hidden; }
+  .legend li {
+    height: 20px; flex-shrink: 0;
+    display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: center; gap: 7px;
+    padding: 0 6px; margin: 0 -6px; border-radius: 5px;
+    transition: background 0.15s;
+  }
+  .legend li:hover { background: var(--surface-card-hover); }
+  .swatch { width: 8px; height: 8px; border-radius: 2px; }
+  .legend-label { font-size: 10.5px; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .legend li.other .legend-label { color: var(--text-2); }
+  .legend-pct { font-family: var(--mono); font-size: 9px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+
+  /* ─── Large: busiest rules right now ─── */
+  .hot { display: none; flex-direction: column; gap: 4px; flex: 0 0 auto; min-height: 0; overflow: hidden; }
+  .section-label {
+    font-size: 8.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--text-3); margin-bottom: 2px; flex-shrink: 0;
+  }
+  .hot-rows { display: flex; flex-direction: column; gap: 4px; }
+  .hot-row {
+    height: 24px; flex-shrink: 0;
+    display: grid; grid-template-columns: minmax(0, 1fr) 54px; align-items: center; gap: 8px;
+    padding: 0 8px 0 10px; position: relative; overflow: hidden;
+    background: var(--surface-card); border: 1px solid var(--border-card); border-radius: 6px;
+  }
+  .hot-bar {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    background: rgba(var(--green-rgb), 0.12);
+    border-right: 1px solid rgba(var(--green-rgb), 0.45);
+    transition: width 0.6s ease;
+  }
+  .hot-label { position: relative; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hot-rate { position: relative; font-family: var(--mono); font-size: 9px; text-align: right; color: var(--text-2); white-space: nowrap; }
+  .hot-empty { font-size: 10px; color: var(--text-3); padding: 4px 0; }
+
+  /* ─── Small (300 x ~150): donut with the live rate inside, legend on the right ─── */
+  .size-small .top, .size-small .footer { display: none; }
+  .size-small .share { gap: 12px; }
+  .size-small .donut-value { font-size: 15px; }
+  .size-small .donut-caption { font-size: 7px; }
+  .size-small .legend li { height: 18px; }
+  .size-small .legend-label { font-size: 10px; }
+
+  .size-large .share { flex: 0 0 132px; }
+  .size-large .hot { display: flex; flex: 1; }
+</style>
+</head>
+<body class="size-medium">
+  <div class="app">
+    <header class="top">
+      <div class="summary">
+        <div class="hero">
+          <span class="hero-num" id="rate">0</span>
+          <span class="hero-unit">evals/s</span>
+        </div>
+        <div class="sub-stats">
+          <div class="sub-stat"><span class="num" id="rule-count">0</span> rules</div>
+          <div class="sub-stat"><span class="num" id="total-evals">0</span> total</div>
+          <div class="sub-stat" id="states-stat"><span class="num" id="states">0</span> states</div>
+        </div>
+      </div>
+      <div class="activity" title="Evaluations per second, last 60 seconds">
+        <svg id="rate-spark"></svg>
+        <div class="axis-label"><span>60s</span><span>now</span></div>
+      </div>
+    </header>
+
+    <section class="share">
+      <div class="donut" id="donut-box">
+        <svg id="donut" viewBox="0 0 100 100"></svg>
+        <div class="donut-center">
+          <span class="donut-value" id="center-value"></span>
+          <span class="donut-caption" id="center-caption"></span>
+        </div>
+      </div>
+      <ol class="legend" id="legend"></ol>
+    </section>
+
+    <section class="hot">
+      <div class="section-label">Busiest right now</div>
+      <div class="hot-rows" id="hot-rows"></div>
+    </section>
+
+    <footer class="footer">
+      <span class="footer-meta" id="meta" title="Since the last pf reset"></span>
+      <span></span>
+      <span class="live" id="live"><span class="dot"></span><span id="live-text">live</span></span>
+    </footer>
+  </div>
+
+<script src="../../Shared/Web/widget.js"></script>
+<script>
+(() => {
+  "use strict";
+  const { el, svgEl, fmt, smoothPath } = Widget;
+
+  const PALETTE = ["--c1", "--c2", "--c3", "--c4", "--c5", "--c6", "--c7", "--c8", "--c9", "--c10"];
+  const RATE_WINDOW_MS = 60 * 1000;
+  const GAP_MS = 3000;          // history points further apart are drawn as separate runs
+  const STALE_MS = 5000;
+  const HOT_ROW_HEIGHT = 24;
+
+  const $ = id => document.getElementById(id);
+  const donutBox = $("donut-box");
+  const donut = $("donut");
+  const legend = $("legend");
+  const hotRows = $("hot-rows");
+
+  let lastData = null;
+  let rates = new Map();        // label -> evaluations per second (from the app)
+  let totalRate = null;
+  let rateHistory = [];         // [unixMs, evals/s] (from the app)
+  let slices = [];              // current donut slices
+  let focus = -1;               // legend row under the pointer
+
+  function takeRates(data) {
+    rates = new Map();
+    for (const rule of data.rules || []) {
+      if (rule.rate !== null && rule.rate !== undefined) rates.set(rule.label, rule.rate);
+    }
+    totalRate = data.rate ?? null;
+    rateHistory = data.rateHistory || [];
+  }
+
+  function drawRateSpark() {
+    const svg = $("rate-spark");
+    const rect = svg.getBoundingClientRect();
+    const w = Math.max(1, rect.width), h = Math.max(1, rect.height);
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    svg.replaceChildren();
+
+    const defs = svgEl("defs");
+    const rgb = getComputedStyle(document.documentElement).getPropertyValue("--green-rgb").trim();
+    const g = svgEl("linearGradient", { id: "grad-rate", x1: 0, x2: 0, y1: 0, y2: 1 });
+    g.appendChild(svgEl("stop", { offset: "0%", "stop-color": `rgb(${rgb})`, "stop-opacity": 0.3 }));
+    g.appendChild(svgEl("stop", { offset: "100%", "stop-color": `rgb(${rgb})`, "stop-opacity": 0.02 }));
+    defs.appendChild(g);
+    svg.appendChild(defs);
+    svg.appendChild(svgEl("line", { class: "rate-base", x1: 0, x2: w, y1: h - 0.5, y2: h - 0.5 }));
+
+    if (rateHistory.length < 2) return;
+    const latest = rateHistory[rateHistory.length - 1][0];
+    const visible = rateHistory.filter(([t]) => latest - t <= RATE_WINDOW_MS);
+    const max = Math.max(1, ...visible.map(r => r[1])) * 1.1;
+    const toPoint = ([t, v]) => [w - ((latest - t) / RATE_WINDOW_MS) * w, h - 1 - (v / max) * (h - 3)];
+
+    // Polling pauses while the board is closed; draw each unbroken run separately.
+    const runs = [];
+    for (const p of visible) {
+      const run = runs[runs.length - 1];
+      if (run && p[0] - run[run.length - 1][0] <= GAP_MS) run.push(p);
+      else runs.push([p]);
+    }
+    for (const run of runs) {
+      if (run.length < 2) continue;
+      const pts = run.map(toPoint);
+      const line = smoothPath(pts, 0, h - 1);
+      svg.appendChild(svgEl("path", { class: "rate-area", d: `${line} L${pts[pts.length - 1][0].toFixed(1)},${h} L${pts[0][0].toFixed(1)},${h} Z` }));
+      svg.appendChild(svgEl("path", { class: "rate-line", d: line }));
+    }
+  }
+
+  function legendRowsThatFit(size) {
+    const rowH = size === "small" ? 18 : 20;
+    return Math.max(2, Math.floor((legend.clientHeight + 2) / (rowH + 2)));
+  }
+
+  function buildSlices(data, size) {
+    const rules = (data.rules || []).filter(r => r.evaluations > 0);
+    const total = (data.totals && data.totals.evaluations) || rules.reduce((s, r) => s + r.evaluations, 0);
+    if (!total) return [];
+    const fit = legendRowsThatFit(size);
+    const moreThanFits = rules.length > fit || (data.ruleCount || 0) > rules.length;
+    const top = rules.slice(0, moreThanFits ? fit - 1 : fit);
+    const result = top.map((r, i) => ({ label: r.label, rule: r.rule, value: r.evaluations, share: r.evaluations / total, color: `var(${PALETTE[i % PALETTE.length]})` }));
+    const shown = top.reduce((s, r) => s + r.evaluations, 0);
+    if (total - shown > 0) {
+      const restCount = Math.max(0, (data.ruleCount || rules.length) - top.length);
+      // Keep each remaining rule as its own thin gray segment, so "Other" reads as a long tail
+      // of small rules rather than one big block.
+      const rest = rules.slice(top.length);
+      const parts = rest.map(r => r.evaluations / total);
+      const unlisted = total - shown - rest.reduce((s, r) => s + r.evaluations, 0);
+      if (unlisted > 0) parts.push(unlisted / total);
+      result.push({ label: `Other (${restCount})`, value: total - shown, share: (total - shown) / total, color: "var(--c-other)", other: true, parts });
+    }
+    return result;
+  }
+
+  function drawDonut() {
+    donut.replaceChildren();
+    const r = 40, thickness = 14, c = 2 * Math.PI * r, gap = slices.length > 1 ? 1.2 : 0;
+    donut.appendChild(svgEl("circle", { class: "track-ring", cx: 50, cy: 50, r, "stroke-width": thickness }));
+    let offset = 0;
+    const arc = (start, share, attrs, gapLen) => {
+      const len = Math.max(0, share * c - gapLen);
+      donut.appendChild(svgEl("circle", {
+        cx: 50, cy: 50, r,
+        "stroke-dasharray": `${len.toFixed(2)} ${(c - len).toFixed(2)}`,
+        "stroke-dashoffset": (-start).toFixed(2),
+        ...attrs
+      }));
+    };
+    slices.forEach((s, i) => {
+      const attrs = {
+        class: "slice" + (i === focus ? " on" : ""),
+        stroke: s.color,
+        "stroke-width": i === focus ? thickness + 3 : thickness
+      };
+      if (s.parts && s.parts.length > 1) {
+        // Long tail: alternate two gray tones; segments too thin to separate blend together.
+        let partOffset = offset;
+        s.parts.forEach((share, k) => {
+          const last = k === s.parts.length - 1;
+          arc(partOffset, share, { ...attrs, "stroke-opacity": k % 2 ? 0.6 : 1 }, last ? gap : 0);
+          partOffset += share * c;
+        });
+      } else {
+        arc(offset, s.share, attrs, gap);
+      }
+      offset += s.share * c;
+    });
+    donutBox.classList.toggle("focus", focus >= 0);
+  }
+
+  function drawLegend() {
+    legend.replaceChildren();
+    slices.forEach((s, i) => {
+      const li = el("li", s.other ? "other" : "");
+      const sw = el("span", "swatch");
+      sw.style.background = s.color;
+      li.appendChild(sw);
+      li.appendChild(el("span", "legend-label", s.label));
+      li.appendChild(el("span", "legend-pct", pct(s.share)));
+      const rate = rates.get(s.label);
+      li.title = `${s.label}\n${fmt.number(s.value)} evaluations (${pct(s.share)})`
+        + (rate !== undefined ? `\n${fmt.compact(rate)}/s now` : "")
+        + (s.rule && s.rule !== s.label ? `\n\n${s.rule}` : "");
+      li.addEventListener("pointerenter", () => setFocus(i));
+      li.addEventListener("pointerleave", () => setFocus(-1));
+      legend.appendChild(li);
+    });
+  }
+
+  function pct(share) {
+    const p = share * 100;
+    return (p >= 10 || p === 0 ? p.toFixed(0) : p.toFixed(1)) + "%";
+  }
+
+  function setFocus(i) {
+    focus = i;
+    drawDonut();
+    drawCenter();
+  }
+
+  function drawCenter() {
+    const size = Widget.size;
+    if (focus >= 0 && slices[focus]) {
+      $("center-value").textContent = pct(slices[focus].share);
+      $("center-caption").textContent = "of evals";
+    } else if (size === "small") {
+      $("center-value").textContent = totalRate === null ? "…" : fmt.compact(totalRate);
+      $("center-caption").textContent = "evals/s";
+    } else {
+      $("center-value").textContent = slices.length ? pct(slices[0].share) : "0%";
+      $("center-caption").textContent = "top rule";
+    }
+  }
+
+  function drawHot() {
+    hotRows.replaceChildren();
+    if (Widget.size !== "large" || !lastData) return;
+    if (!rates.size) {
+      hotRows.appendChild(el("div", "hot-empty", "Measuring…"));
+      return;
+    }
+    const busy = (lastData.rules || [])
+      .map(r => ({ label: r.label, rule: r.rule, rate: rates.get(r.label) || 0 }))
+      .filter(r => r.rate > 0)
+      .sort((a, b) => b.rate - a.rate);
+    if (!busy.length) {
+      hotRows.appendChild(el("div", "hot-empty", "No rule activity in the last second"));
+      return;
+    }
+    const box = hotRows.parentElement;
+    const label = box.querySelector(".section-label");
+    const room = box.clientHeight - label.offsetHeight - 6;
+    const fit = Math.max(1, Math.floor((room + 4) / (HOT_ROW_HEIGHT + 4)));
+    const max = busy[0].rate;
+    for (const r of busy.slice(0, fit)) {
+      const row = el("div", "hot-row");
+      const bar = el("div", "hot-bar");
+      bar.style.width = Math.max(2, (r.rate / max) * 100) + "%";
+      row.appendChild(bar);
+      row.appendChild(el("span", "hot-label", r.label));
+      row.appendChild(el("span", "hot-rate", fmt.compact(r.rate) + "/s"));
+      row.title = r.rule && r.rule !== r.label ? `${r.label}\n\n${r.rule}` : r.label;
+      hotRows.appendChild(row);
+    }
+  }
+
+  function render(data, size, fresh) {
+    takeRates(data);
+    lastData = data;
+    const totals = data.totals || {};
+
+    $("rate").textContent = totalRate === null ? "…" : fmt.compact(totalRate);
+    $("rule-count").textContent = fmt.number(data.ruleCount || 0);
+    $("total-evals").textContent = fmt.compact(totals.evaluations || 0);
+    $("states").textContent = fmt.compact(totals.states || 0);
+    $("states-stat").style.display = size === "large" ? "" : "none";
+    $("meta").textContent = `${fmt.compact(totals.packets || 0)} pkts · ${fmt.bytes(totals.bytes || 0)}`;
+
+    drawRateSpark();
+    slices = buildSlices(data, size);
+    if (focus >= slices.length) focus = -1;
+    drawDonut();
+    drawLegend();
+    drawCenter();
+    drawHot();
+    updateLive();
+  }
+
+  function updateLive() {
+    const stale = !lastData || Date.now() - (lastData.updatedAt || 0) > STALE_MS;
+    $("live").classList.toggle("stale", stale);
+    $("live-text").textContent = stale ? fmt.time(lastData && lastData.updatedAt) || "waiting" : "live";
+  }
+  setInterval(updateLive, 1000);
+
+  Widget.start({ render, demo: demoData, demoIntervalMs: 1000 });
+
+  // Demo data for previewing the page outside the Widget Board: counters that grow at varying rates.
+  function demoData() {
+    const now = Math.floor(Date.now() / 1000) * 1000;
+    const s = (now / 1000) % 20000;   // short-running counters so the base counts dominate the shares
+    // [readable label (from PfRuleLabel), raw pf rule, base count, evals/s]
+    const list = [
+      ["Scrub in · reassemble fragments", "scrub in all fragment reassemble", 1.5e8, 1700],
+      ["No NAT · CARP", "no nat proto carp all", 8.7e7, 1],
+      ["NAT · LAN → WAN", "nat on vmx0 inet from (vmx1:network:1) to any -> (vmx0:0) port 1024:65535", 8.6e7, 1],
+      ["NAT · DMZ → WAN", "nat on vmx0 inet from (vmx2:network:1) to any -> (vmx0:0) port 1024:65535", 7.7e7, 1],
+      ["NAT · VPN → WAN", "nat on vmx0 inet from (ovpns1:network:1) to any -> (vmx0:0) port 1024:65535", 7.6e7, 1],
+      ["Default allow LAN to any rule", "pass in quick on vmx1 inet from (vmx1:network) to any keep state", 6.1e7, 40],
+      ["Block in · not DMZ · from 192.168.20.0/24", "block drop in log on ! vmx2 inet from 192.168.20.0/24 to any", 3.3e7, 2],
+      ["No redirect · CARP", "no rdr proto carp all", 2.9e7, 1],
+      ["Block in · WAN · from bogons", "block drop in log quick on vmx0 inet from <bogons> to any", 2.2e7, 6],
+      ["Allow in · LAN · UDP · :bootpc → 255.255.255.255:bootps", "pass in quick on vmx1 inet proto udp from any port = bootpc to 255.255.255.255 port = bootps keep state", 1.4e7, 3],
+      ["Block in · from 192.168.20.1", "block drop in log inet from 192.168.20.1 to any", 9.1e6, 1],
+      ["Anti-lockout rule", "pass in quick on vmx1 proto tcp from any to (self) port { 22 443 } flags S/SA keep state", 6.2e6, 2],
+      ["Allow out · everything", "pass out log inet all keep state allow-opts", 4.4e6, 12],
+      ["Block in · everything", "block drop in log inet all", 3.1e6, 4],
+      ["Block in · everything · IPv6", "block drop in log inet6 all", 1.2e6, 1],
+      ["Redirect · WAN · TCP · :443 → 192.168.1.10", "rdr on vmx0 inet proto tcp from any to (vmx0:0) port = 443 -> 192.168.1.10", 9.0e5, 1]
+    ];
+    // Cumulative counters and their exact derivative (the live rate) at second x.
+    const evalsAt = (base, rate, i, x) => base + rate * x + 2 * rate * Math.cos(x / 5 + i);
+    const rateAt = (rate, i, x) => rate * (1 - 0.4 * Math.sin(x / 5 + i));
+    const rules = list.map(([label, rule, base, rate], i) => {
+      const evaluations = Math.round(evalsAt(base, rate, i, s));
+      return {
+        label, rule, evaluations,
+        packets: Math.round(evaluations * 0.7), bytes: Math.round(evaluations * 410), states: Math.round(rate * 3),
+        rate: Math.round(rateAt(rate, i, s) * 10) / 10
+      };
+    }).sort((a, b) => b.evaluations - a.evaluations);
+    const sum = key => rules.reduce((t, r) => t + r[key], 0);
+    const totalRateAt = x => list.reduce((t, [, , , rate], i) => t + rateAt(rate, i, x), 0);
+    return {
+      updatedAt: now,
+      ruleCount: 42,
+      rate: Math.round(totalRateAt(s)),
+      rateHistory: Array.from({ length: 60 }, (_, k) => [now - (59 - k) * 1000, Math.round(totalRateAt(s - (59 - k)))]),
+      totals: { evaluations: sum("evaluations") + 1.2e7, packets: sum("packets"), bytes: sum("bytes"), states: sum("states") },
+      rules
+    };
+  }
+})();
+</script>
+</body>
+</html>

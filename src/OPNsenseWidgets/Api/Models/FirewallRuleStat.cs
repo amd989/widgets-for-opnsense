@@ -14,4 +14,9 @@ public sealed class FirewallRuleStat
         !string.IsNullOrWhiteSpace(Description) ? Description :
         !string.IsNullOrWhiteSpace(Label) ? Label :
         "(unnamed rule)";
+
+    /// <summary>Readable form of <see cref="EffectiveLabel"/> (set by FirewallWidget via PfRuleLabel).</summary>
+    public string? DisplayLabel { get; set; }
+
+    public string ShownLabel => DisplayLabel ?? EffectiveLabel;
 }

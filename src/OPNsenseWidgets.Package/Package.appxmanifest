@@ -112,7 +112,8 @@
                               DisplayName="Traffic"
                               Description="Shows real-time network traffic throughput for your OPNsense router's WAN interface"
                               IsCustomizable="true"
-                              AllowMultiple="false">
+                              AllowMultiple="false"
+                              WebRequestFilter="https://opnsense-widget.test/*">
                     <Capabilities>
                       <Capability>
                         <Size Name="small" />
@@ -144,7 +145,8 @@
                               DisplayName="Firewall"
                               Description="Shows top firewall rules by evaluations as a live donut chart"
                               IsCustomizable="true"
-                              AllowMultiple="false">
+                              AllowMultiple="false"
+                              WebRequestFilter="https://opnsense-widget.test/*">
                     <Capabilities>
                       <Capability>
                         <Size Name="small" />

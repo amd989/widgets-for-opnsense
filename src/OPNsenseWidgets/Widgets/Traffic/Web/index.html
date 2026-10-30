@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Traffic</title>
+<!--
+  Traffic widget page (redesign v3, see design/widget-mockup-v3.html). Updates every second.
+  Payload (TrafficWidget.BuildWebData):
+    {updatedAt, interfaces:[{id, name, isWan, totalIn, totalOut, samples:[[unixMs, inBps, outBps], ...]}]}
+  WAN first. Download is green and drawn above the center line, upload is blue and drawn below.
+  Shared protocol, theme and helpers: ../../Shared/Web/widget.{css,js}.
+-->
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../../Shared/Web/widget.css">
+<style>
+  .main { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+
+  /* ─── Current WAN speeds ─── */
+  .speeds { display: flex; align-items: flex-end; gap: 22px; flex-shrink: 0; }
+  .speed-label {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 8.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .speed-label svg { width: 8px; height: 8px; }
+  .down .speed-label { color: rgba(var(--down-rgb), 0.9); }
+  .up .speed-label { color: rgba(var(--up-rgb), 0.9); }
+  .reading { display: flex; align-items: baseline; gap: 4px; }
+  .val {
+    font-size: 26px; font-weight: 800; letter-spacing: -0.03em; line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .unit { font-size: 11px; color: var(--text-2); }
+
+  /* ─── Mirrored chart: download above, upload below ─── */
+  .chart {
+    flex: 1;
+    min-height: 60px;
+    position: relative;
+    border-radius: 8px;
+    background: var(--surface-card);
+    border: 1px solid var(--border-card);
+    overflow: hidden;
+  }
+  .chart svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .chart-tag, .chart-scale, .chart-window {
+    position: absolute; z-index: 1;
+    font-size: 8px; color: var(--text-3); pointer-events: none;
+  }
+  .chart-tag { top: 6px; left: 8px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+  .chart-scale { top: 6px; right: 8px; font-family: var(--mono); font-weight: var(--thin); }
+  .chart-window { bottom: 5px; left: 8px; font-family: var(--mono); font-weight: var(--thin); }
+
+  .area-down { fill: url(#grad-down); }
+  .area-up { fill: url(#grad-up); }
+  .line-down { fill: none; stroke: var(--down); stroke-width: 1.5; stroke-linejoin: round; }
+  .line-up { fill: none; stroke: var(--up); stroke-width: 1.5; stroke-linejoin: round; }
+  .axis { stroke: var(--grid); stroke-width: 1; }
+  .gridline { stroke: var(--grid); stroke-width: 1; stroke-dasharray: 2 3; }
+  .head-down { fill: var(--down); filter: drop-shadow(0 0 3px var(--green-glow)); }
+  .head-up { fill: var(--up); filter: drop-shadow(0 0 3px var(--blue-glow)); }
+
+  /* ─── Other interfaces ─── */
+  .ifaces { display: flex; flex-direction: column; gap: var(--gap); flex-shrink: 0; }
+  .iface {
+    height: 30px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 60px 60px 50px;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px 0 11px;
+    background: var(--surface-card);
+    border: 1px solid var(--border-card);
+    border-radius: 7px;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .iface::before {
+    content: ""; position: absolute; left: 0; top: 7px; bottom: 7px;
+    width: 2px; border-radius: 1px; background: var(--gray-dot);
+  }
+  .iface.busy::before { background: var(--green); box-shadow: 0 0 6px var(--green-glow); }
+  .iface-name { font-size: 11px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rate { font-family: var(--mono); font-size: 9px; text-align: right; white-space: nowrap; }
+  .rate.down { color: rgba(var(--down-rgb), 0.95); }
+  .rate.up { color: rgba(var(--up-rgb), 0.95); }
+  .iface svg { width: 50px; height: 20px; }
+
+  .footer-center { font-size: 9px; color: var(--text-3); white-space: nowrap; }
+
+  /* ─── Small (300 x ~150): speeds stacked on the left, WAN chart on the right ─── */
+  .size-small .main { flex-direction: row; gap: 12px; }
+  .size-small .speeds { flex-direction: column; align-items: flex-start; justify-content: center; gap: 7px; flex: 0 0 104px; }
+  .size-small .val { font-size: 21px; }
+  .size-small .speed-label { margin-bottom: 2px; }
+  .size-small .chart { min-height: 0; }
+  .size-small .chart-window { display: none; }
+  .size-small .ifaces, .size-small .footer { display: none; }
+
+</style>
+</head>
+<body class="size-medium">
+  <div class="app">
+    <div class="main">
+      <header class="speeds">
+        <div class="speed down">
+          <div class="speed-label">
+            <svg viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 1v6M1.5 4.5 4 7l2.5-2.5"/></svg>
+            Down
+          </div>
+          <div class="reading"><span class="val" id="down-val">0</span><span class="unit" id="down-unit">bps</span></div>
+        </div>
+        <div class="speed up">
+          <div class="speed-label">
+            <svg viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V1M1.5 3.5 4 1l2.5 2.5"/></svg>
+            Up
+          </div>
+          <div class="reading"><span class="val" id="up-val">0</span><span class="unit" id="up-unit">bps</span></div>
+        </div>
+      </header>
+
+      <section class="chart" id="chart">
+        <span class="chart-tag" id="chart-tag"></span>
+        <span class="chart-scale" id="chart-scale"></span>
+        <span class="chart-window">60s</span>
+        <svg id="chart-svg"></svg>
+      </section>
+    </div>
+
+    <section class="ifaces" id="ifaces"></section>
+
+    <footer class="footer">
+      <span class="footer-meta" id="totals" title="WAN since boot"></span>
+      <span class="footer-center" id="more"></span>
+      <span class="live" id="live"><span class="dot"></span><span id="live-text">live</span></span>
+    </footer>
+  </div>
+
+<script src="../../Shared/Web/widget.js"></script>
+<script>
+(() => {
+  "use strict";
+  const { el, svgEl, fmt, niceCeil, smoothPath } = Widget;
+
+  const WINDOW_MS = 60 * 1000;
+  const GAP_MS = 3000;      // samples further apart than this are drawn as separate runs
+  const STALE_MS = 5000;
+  const MAX_ROWS = 8;
+  // Interface rows are added while the WAN chart keeps at least this height; it takes the rest.
+  const MIN_CHART = { medium: 90, large: 130 };
+
+  const $ = id => document.getElementById(id);
+  const chartSvg = $("chart-svg");
+  const ifacesBox = $("ifaces");
+
+  let lastData = null;
+
+  /**
+   * Mirrored area chart: download above the center line, upload below.
+   * samples: [[unixMs, inBps, outBps], ...]. Returns the scale maximum used.
+   */
+  function drawMirror(svg, samples, { detail, scaleMax }) {
+    const rect = svg.getBoundingClientRect();
+    const w = Math.max(1, rect.width), h = Math.max(1, rect.height);
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    svg.replaceChildren();
+
+    const mid = h / 2;
+    const pad = detail ? 14 : 1.5;           // keep room for the labels in the main chart
+    const half = Math.max(1, mid - pad);
+
+    const latest = samples.length ? samples[samples.length - 1][0] : Date.now();
+    const visible = samples.filter(s => latest - s[0] <= WINDOW_MS + 1000);
+    const peak = Math.max(1000, ...visible.map(s => Math.max(s[1], s[2])));
+    const max = scaleMax || niceCeil(peak * 1.1);
+    const x = t => w - ((latest - t) / WINDOW_MS) * w;
+    const yDown = v => mid - Math.min(1, v / max) * half;
+    const yUp = v => mid + Math.min(1, v / max) * half;
+
+    if (detail) {
+      const defs = svgEl("defs");
+      defs.appendChild(gradient("grad-down", "--down-rgb", true));
+      defs.appendChild(gradient("grad-up", "--up-rgb", false));
+      svg.appendChild(defs);
+      svg.appendChild(svgEl("line", { class: "gridline", x1: 0, x2: w, y1: mid - half, y2: mid - half }));
+      svg.appendChild(svgEl("line", { class: "gridline", x1: 0, x2: w, y1: mid + half, y2: mid + half }));
+    }
+    svg.appendChild(svgEl("line", { class: "axis", x1: 0, x2: w, y1: mid, y2: mid }));
+
+    // The app only polls while the board is open, so history can have holes. Draw each run of
+    // consecutive samples separately instead of bridging the hole with a straight line.
+    const segments = [];
+    for (const s of visible) {
+      const run = segments[segments.length - 1];
+      if (run && s[0] - run[run.length - 1][0] <= GAP_MS) run.push(s);
+      else segments.push([s]);
+    }
+
+    let lastDown = null, lastUp = null;
+    for (const run of segments) {
+      if (run.length < 2) continue;
+      const down = run.map(s => [x(s[0]), yDown(s[1])]);
+      const up = run.map(s => [x(s[0]), yUp(s[2])]);
+      const x0 = down[0][0].toFixed(1), x1 = down[down.length - 1][0].toFixed(1);
+      const downLine = smoothPath(down, mid - half, mid);
+      const upLine = smoothPath(up, mid, mid + half);
+
+      if (detail) {
+        svg.appendChild(svgEl("path", { class: "area-down", d: `${downLine} L${x1},${mid} L${x0},${mid} Z` }));
+        svg.appendChild(svgEl("path", { class: "area-up", d: `${upLine} L${x1},${mid} L${x0},${mid} Z` }));
+      }
+      svg.appendChild(svgEl("path", { class: "line-down", d: downLine }));
+      svg.appendChild(svgEl("path", { class: "line-up", d: upLine }));
+      lastDown = down[down.length - 1];
+      lastUp = up[up.length - 1];
+    }
+
+    if (detail && lastDown) {
+      svg.appendChild(svgEl("circle", { class: "head-down", cx: lastDown[0] - 1.5, cy: lastDown[1], r: 2.5 }));
+      svg.appendChild(svgEl("circle", { class: "head-up", cx: lastUp[0] - 1.5, cy: lastUp[1], r: 2.5 }));
+    }
+    return max;
+  }
+
+  function gradient(id, rgbVar, downward) {
+    const rgb = getComputedStyle(document.documentElement).getPropertyValue(rgbVar).trim();
+    const g = svgEl("linearGradient", { id, x1: 0, x2: 0, y1: downward ? 0 : 1, y2: downward ? 1 : 0 });
+    g.appendChild(svgEl("stop", { offset: "0%", "stop-color": `rgb(${rgb})`, "stop-opacity": 0.32 }));
+    g.appendChild(svgEl("stop", { offset: "100%", "stop-color": `rgb(${rgb})`, "stop-opacity": 0.02 }));
+    return g;
+  }
+
+  function latestOf(iface) {
+    const s = iface && iface.samples && iface.samples[iface.samples.length - 1];
+    return s ? { down: s[1], up: s[2] } : { down: 0, up: 0 };
+  }
+
+  function setReading(prefix, bps) {
+    const b = fmt.bits(bps);
+    $(prefix + "-val").textContent = b.value;
+    $(prefix + "-unit").textContent = b.unit;
+  }
+
+  function ifaceRow(iface) {
+    const now = latestOf(iface);
+    const row = el("div", "iface" + (now.down + now.up > 1e6 ? " busy" : ""));
+    row.appendChild(el("span", "iface-name", iface.name));
+    row.appendChild(el("span", "rate down", "↓ " + fmt.bitsText(now.down)));
+    row.appendChild(el("span", "rate up", "↑ " + fmt.bitsText(now.up)));
+    const spark = svgEl("svg");
+    row.appendChild(spark);
+    row.title = `${iface.name} (${iface.id})\nSince boot: ↓ ${fmt.bytes(iface.totalIn)}  ↑ ${fmt.bytes(iface.totalOut)}`;
+    return { row, spark, iface };
+  }
+
+  function render(data, size) {
+    lastData = data;
+    const ifs = data.interfaces || [];
+    const wan = ifs.find(i => i.isWan) || ifs[0];
+
+    const now = latestOf(wan);
+    setReading("down", now.down);
+    setReading("up", now.up);
+
+    // Other interfaces first, so the chart is drawn at its final size.
+    const others = ifs.filter(i => i !== wan);
+    const rows = size === "small" ? [] : others.slice(0, MAX_ROWS).map(ifaceRow);
+    ifacesBox.replaceChildren(...rows.map(r => r.row));
+    const minChart = MIN_CHART[size] || 0;
+    while (rows.length && $("chart").clientHeight < minChart) {
+      rows.pop().row.remove();
+    }
+    for (const { spark, iface } of rows) drawMirror(spark, iface.samples || [], { detail: false });
+    const hidden = others.length - rows.length;
+    $("more").textContent = hidden > 0 && size !== "small" ? `+${hidden} more` : "";
+
+    $("chart-tag").textContent = wan ? wan.name : "";
+    const max = drawMirror(chartSvg, (wan && wan.samples) || [], { detail: true });
+    $("chart-scale").textContent = fmt.bitsText(max);
+
+    $("totals").textContent = wan
+      ? `↓ ${fmt.bytes(wan.totalIn)}  ↑ ${fmt.bytes(wan.totalOut)}`
+      : "";
+    updateLive();
+  }
+
+  function updateLive() {
+    const stale = !lastData || Date.now() - (lastData.updatedAt || 0) > STALE_MS;
+    $("live").classList.toggle("stale", stale);
+    $("live-text").textContent = stale ? fmt.time(lastData && lastData.updatedAt) || "waiting" : "live";
+  }
+  setInterval(updateLive, 1000);
+
+  Widget.start({ render, demo: demoData, demoIntervalMs: 1000 });
+
+  // Demo data for previewing the page outside the Widget Board: smooth pseudo-random traffic.
+  function demoData() {
+    const now = Math.floor(Date.now() / 1000) * 1000;
+    const list = [
+      ["igb0", "WAN", true, 180e6, 24e6],
+      ["igb1", "LAN", false, 150e6, 165e6],
+      ["igb2", "IoT", false, 3.5e6, 1.2e6],
+      ["wg0", "WireGuard", false, 9e6, 7e6]
+    ];
+    return {
+      updatedAt: now,
+      interfaces: list.map(([id, name, isWan, baseIn, baseOut], k) => ({
+        id, name, isWan,
+        totalIn: 1.32e12 / (k + 1),
+        totalOut: 2.1e11 / (k + 1),
+        samples: Array.from({ length: 60 }, (_, i) => {
+          const t = now - (59 - i) * 1000, s = t / 1000;
+          const wave = (base, phase) => Math.max(0, base * (0.5 + 0.28 * Math.sin(s / 7 + phase + k)
+            + 0.14 * Math.sin(s / 2.3 + phase * 2) + 0.08 * Math.sin(s * 1.7 + k * 3)));
+          return [t, wave(baseIn, 0), wave(baseOut, 1.3)];
+        })
+      }))
+    };
+  }
+})();
+</script>
+</body>
+</html>

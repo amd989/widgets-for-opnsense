@@ -5,7 +5,9 @@ namespace OPNsenseWidgets.Provider;
 
 /// <summary>
 /// Serves web widget files embedded from Widgets/&lt;Name&gt;/Web/ for requests to <see cref="Origin"/>.
-/// URL https://opnsense-widget.test/DhcpLeases/index.html maps to Widgets/DhcpLeases/Web/index.html.
+/// URL https://opnsense-widget.test/DhcpLeases/Web/index.html maps to Widgets/DhcpLeases/Web/index.html.
+/// URLs mirror the source tree so relative links (../../Shared/Web/widget.css) work both in the
+/// widget and when a page is opened from disk for preview.
 /// The origin does not exist on the network; the Widget Board routes it to the provider through
 /// the manifest WebRequestFilter and IWidgetResourceProvider.
 /// </summary>
@@ -15,11 +17,11 @@ public static class WebContent
 
     private static readonly Assembly Assembly = typeof(WebContent).Assembly;
 
-    // Lower-cased "folder/file" -> manifest resource name.
+    // Lower-cased "folder/web/file" -> manifest resource name.
     private static readonly Dictionary<string, string> Resources = Assembly.GetManifestResourceNames()
         .Select(name => (name, match: System.Text.RegularExpressions.Regex.Match(name, @"^OPNsenseWidgets\.Widgets\.(\w+)\.Web\.(.+)$")))
         .Where(x => x.match.Success)
-        .ToDictionary(x => $"{x.match.Groups[1].Value}/{x.match.Groups[2].Value}".ToLowerInvariant(), x => x.name);
+        .ToDictionary(x => $"{x.match.Groups[1].Value}/web/{x.match.Groups[2].Value}".ToLowerInvariant(), x => x.name);
 
     public static string UrlFor(string path) => $"{Origin}/{path.TrimStart('/')}";
 

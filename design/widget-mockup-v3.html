@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DHCP Widget Redesign v3</title>
+<!--
+  Live mockup: each frame embeds the real widget page (demo data) at the real Widget Board size,
+  with a fake board title bar on top. Open this file directly in a browser.
+-->
+<style>
+  :root {
+    --bg: #1c1c1c;
+    --tile: #2b2b2b;
+    --tile-border: rgba(255, 255, 255, 0.06);
+    --text-1: #eaecf2;
+    --text-2: rgba(234, 236, 242, 0.55);
+    --text-3: rgba(234, 236, 242, 0.32);
+    --accent: #5ba3ff;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #e9e9e9;
+      --tile: #f9f9f9;
+      --tile-border: rgba(0, 0, 0, 0.06);
+      --text-1: #1b1d24;
+      --text-2: rgba(27, 29, 36, 0.6);
+      --text-3: rgba(27, 29, 36, 0.4);
+      --accent: #2f7de1;
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text-1);
+    font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    padding: 40px 24px 64px;
+  }
+  header { text-align: center; margin-bottom: 36px; }
+  header h1 { font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-3); }
+  header p { font-size: 12px; color: var(--text-3); margin-top: 6px; }
+
+  .widget-section { margin-bottom: 44px; }
+  .section-title { text-align: center; font-size: 13px; font-weight: 600; color: var(--text-2); margin-bottom: 16px; }
+  .row { display: flex; justify-content: center; align-items: flex-start; gap: 32px; flex-wrap: wrap; }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .label { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-3); }
+  .dims { font-size: 10px; font-family: "Cascadia Mono", Consolas, monospace; color: var(--text-3); }
+
+  .tile {
+    width: 302px;
+    position: relative;
+    background: var(--tile);
+    border: 1px solid var(--tile-border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  }
+  .tile.small { height: 148px; }
+  .tile.medium { height: 306px; }
+  .tile.large { height: 464px; }
+  .tile iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; }
+  .titlebar {
+    position: absolute; top: 0; left: 0; right: 0; height: 44px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 14px; pointer-events: none; z-index: 1;
+    font-size: 13px;
+  }
+  .titlebar .name { display: flex; align-items: center; gap: 8px; }
+  .titlebar .icon { width: 16px; height: 16px; border-radius: 4px; border: 3px solid #e2531a; }
+  .titlebar .more { letter-spacing: 2px; color: var(--text-2); }
+
+  .notes { max-width: 980px; margin: 56px auto 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+  .note { background: var(--tile); border: 1px solid var(--tile-border); border-radius: 10px; padding: 14px 16px; }
+  .note h3 { font-size: 12px; color: var(--accent); margin-bottom: 6px; }
+  .note p { font-size: 12px; line-height: 1.55; color: var(--text-2); }
+</style>
+</head>
+<body>
+  <header>
+    <h1>OPNsense Widgets, Redesign v3</h1>
+    <p>Real Widget Board sizes, live widget pages with demo data (Traffic and Firewall update every second).</p>
+  </header>
+
+  <div id="widgets"></div>
+  <script>
+    // One row per widget, one tile per size. Each tile embeds the real page in demo mode.
+    const widgets = [
+      ["DHCP Leases", "DhcpLeases"],
+      ["Traffic", "Traffic"],
+      ["Firewall", "Firewall"]
+    ];
+    const sizes = [["small", 148], ["medium", 306], ["large", 464]];
+    const host = document.getElementById("widgets");
+    for (const [title, folder] of widgets) {
+      const section = document.createElement("section");
+      section.className = "widget-section";
+      section.innerHTML = `<h2 class="section-title">${title}</h2>`;
+      const row = document.createElement("div");
+      row.className = "row";
+      for (const [size, height] of sizes) {
+        row.insertAdjacentHTML("beforeend", `
+          <div class="col">
+            <span class="label">${size}</span>
+            <div class="tile ${size}">
+              <div class="titlebar"><span class="name"><span class="icon"></span>${title}</span><span class="more">&middot;&middot;&middot;</span></div>
+              <iframe title="${title} ${size}" src="../src/OPNsenseWidgets/Widgets/${folder}/Web/index.html?size=${size}"></iframe>
+            </div>
+            <span class="dims">300 &times; ${height}</span>
+          </div>`);
+      }
+      section.appendChild(row);
+      host.appendChild(section);
+    }
+  </script>
+
+  <div class="notes">
+    <div class="note">
+      <h3>Real sizes</h3>
+      <p>Every size is 302px wide; only the height changes (148, 306 and 464, measured on the board). The board draws its title bar over the top 44px, so the content starts below it. v2 assumed a narrow 168px small and a 364px medium.</p>
+    </div>
+    <div class="note">
+      <h3>Activity moves up</h3>
+      <p>The 24h chart now sits to the right of the device count instead of on its own row. That fills the empty space next to the count and frees a full row of cards in every size.</p>
+    </div>
+    <div class="note">
+      <h3>Carousel, not scrolling</h3>
+      <p>Cards come in pages that exactly fill the space: rows are fitted to the height, then stretched so there is no leftover gap. Page with the arrows, the dots, a drag, or a sideways touchpad swipe. Capped at 5 pages, like the Adaptive Card version.</p>
+    </div>
+    <div class="note">
+      <h3>Per size</h3>
+      <p>Small: count, new and active, chart, one row of two compact cards. Medium: adds vendor, 3 rows of cards, footer with time, pager and refresh. Large: adds reserved count, MAC addresses and 5 rows.</p>
+    </div>
+    <div class="note">
+      <h3>One footer row</h3>
+      <p>Update time, pager and refresh share a single 18px row (medium and large). Small shows only the page dots.</p>
+    </div>
+    <div class="note">
+      <h3>Unchanged from v2</h3>
+      <p>Colors, status stripes (blue new, green active, gray stale, purple reserved), relative times, and light and dark themes.</p>
+    </div>
+    <div class="note">
+      <h3>Traffic</h3>
+      <p>WAN download and upload up top, then a live 60s mirrored chart: download (green) above the line, upload (blue) below, same colors as the card charts. Medium adds the LAN row; large lists every other interface with its own mini chart. Footer shows WAN totals since boot.</p>
+    </div>
+    <div class="note">
+      <h3>Firewall</h3>
+      <p>Live evaluations per second with a 60s chart, then the donut of each rule's share of all evaluations with a legend (hover a row to highlight its slice). Large adds the busiest rules right now. Small fits the live rate inside the donut.</p>
+    </div>
+    <div class="note">
+      <h3>Shared</h3>
+      <p>All three pages use Widgets/Shared/Web/widget.css and widget.js for the theme, the ready and data messages, resizing and demo mode.</p>
+    </div>
+  </div>
+</body>
+</html>

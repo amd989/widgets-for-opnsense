@@ -1,0 +1,213 @@
+/*
+  Shared styles for the web widget pages (Widgets/<Name>/Web/index.html).
+  Visual language from design/widget-mockup.html; sizes from design/widget-mockup-v3.html:
+  every size is 302px wide (small 148, medium 306, large 464 tall, measured on the board) and the board draws its
+  title bar over the top ~44px of the page.
+*/
+:root {
+  color-scheme: dark light;
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --mono: "Cascadia Mono", "Cascadia Code", Consolas, monospace;
+
+  --surface-card: rgba(255, 255, 255, 0.035);
+  --surface-card-hover: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.06);
+  --border-card: rgba(255, 255, 255, 0.07);
+
+  --text-1: #eaecf2;
+  --text-2: rgba(234, 236, 242, 0.58);
+  --text-3: rgba(234, 236, 242, 0.34);
+  --text-mono: rgba(176, 190, 220, 0.78);
+  /* Weight for small mono captions (times, totals, axis labels). */
+  --thin: 300;
+
+  --green: #2dd4a0;
+  --green-rgb: 45, 212, 160;
+  --green-glow: rgba(45, 212, 160, 0.25);
+  --blue: #5ba3ff;
+  --blue-rgb: 91, 163, 255;
+  --blue-soft: rgba(91, 163, 255, 0.10);
+  --blue-soft-hover: rgba(91, 163, 255, 0.18);
+  --blue-glow: rgba(91, 163, 255, 0.20);
+  --purple: #9b87f5;
+  --purple-soft: rgba(155, 135, 245, 0.10);
+  --amber: #f0b942;
+
+  /* Traffic: download green, upload blue (same as the card charts). */
+  --down: var(--green);
+  --down-rgb: var(--green-rgb);
+  --up: var(--blue);
+  --up-rgb: var(--blue-rgb);
+
+  /* Categorical palette, same order as DonutChartRenderer. */
+  --c1: #fb923c; --c2: #4ade80; --c3: #f87171; --c4: #a78bfa; --c5: #b48055;
+  --c6: #f472b6; --c7: #94a3b8; --c8: #60a5fa; --c9: #fbbf24; --c10: #2dd4a0;
+  --c-other: rgba(255, 255, 255, 0.22);
+
+  --gray-dot: rgba(255, 255, 255, 0.14);
+  --grid: rgba(255, 255, 255, 0.06);
+  --dot: rgba(255, 255, 255, 0.18);
+  --dot-active: rgba(255, 255, 255, 0.75);
+
+  /* The board draws its title bar over the top of the web view. */
+  --title-bar: 44px;
+  --pad-x: 16px;
+  --pad-bottom: 10px;
+  --gap: 6px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --surface-card: rgba(0, 0, 0, 0.03);
+    --surface-card-hover: rgba(0, 0, 0, 0.055);
+    --border: rgba(0, 0, 0, 0.07);
+    --border-card: rgba(0, 0, 0, 0.07);
+
+    /* Light backgrounds wash out faint, thin text more than dark ones, so these run stronger. */
+    --text-1: #1b1d24;
+    --text-2: rgba(27, 29, 36, 0.70);
+    --text-3: rgba(27, 29, 36, 0.58);
+    --text-mono: rgba(38, 56, 96, 0.88);
+    --thin: 400;
+
+    --green: #0e9f74;
+    --green-rgb: 14, 159, 116;
+    --green-glow: rgba(14, 159, 116, 0.22);
+    --blue: #2f7de1;
+    --blue-rgb: 47, 125, 225;
+    --blue-soft: rgba(47, 125, 225, 0.10);
+    --blue-soft-hover: rgba(47, 125, 225, 0.18);
+    --blue-glow: rgba(47, 125, 225, 0.22);
+    --purple: #7a63e0;
+    --purple-soft: rgba(122, 99, 224, 0.10);
+    --amber: #c98a0b;
+
+    --c1: #ea7a1f; --c2: #22a95a; --c3: #e04848; --c4: #7c5fe6; --c5: #9a6638;
+    --c6: #d9468f; --c7: #64748b; --c8: #2f7de1; --c9: #d19a0a; --c10: #0e9f74;
+    --c-other: rgba(0, 0, 0, 0.18);
+
+    --gray-dot: rgba(0, 0, 0, 0.16);
+    --grid: rgba(0, 0, 0, 0.07);
+    --dot: rgba(0, 0, 0, 0.18);
+    --dot-active: rgba(0, 0, 0, 0.65);
+  }
+}
+
+/* Preview outside the board only (the widget page itself is transparent). */
+html.preview { background: #272727; }
+@media (prefers-color-scheme: light) { html.preview { background: #f3f3f3; } }
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: transparent;
+  color: var(--text-1);
+  font-family: var(--font);
+  overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+svg { display: block; overflow: visible; }
+
+.app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: var(--title-bar) var(--pad-x) var(--pad-bottom);
+}
+.size-small { --pad-x: 14px; --pad-bottom: 8px; --gap: 5px; }
+.size-small .app { gap: 7px; }
+
+/* ─── Hero number + sub-stats ─── */
+.hero { display: flex; align-items: baseline; gap: 6px; }
+.hero-num {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.hero-unit { font-size: 12px; color: var(--text-2); letter-spacing: 0.02em; }
+.size-small .hero-num { font-size: 24px; }
+.size-small .hero-unit { font-size: 10px; }
+
+.sub-stats { display: flex; gap: 10px; margin-top: 5px; }
+.size-small .sub-stats { margin-top: 3px; gap: 8px; }
+.sub-stat {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 10px; color: var(--text-2); white-space: nowrap;
+}
+.sub-stat .dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.sub-stat .num { font-weight: 600; color: var(--text-1); font-variant-numeric: tabular-nums; }
+.dot.b { background: var(--blue); animation: blink 1.8s ease-in-out infinite; }
+.dot.g { background: var(--green); box-shadow: 0 0 6px var(--green-glow); }
+.dot.p { background: var(--purple); }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* Small chart caption under sparklines: "24h ... now" */
+.axis-label {
+  display: flex; justify-content: space-between;
+  font-size: 8px; color: var(--text-3); margin-top: 3px;
+  font-family: var(--mono); font-weight: var(--thin); letter-spacing: 0.06em;
+}
+
+/* ─── Footer: meta left, pager center, action right ─── */
+.footer {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  height: 18px;
+  flex-shrink: 0;
+}
+.footer > :last-child { justify-self: end; }
+.footer-meta {
+  font-size: 9px; font-family: var(--mono); font-weight: var(--thin);
+  color: var(--text-3); letter-spacing: 0.04em; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+
+.refresh-btn {
+  width: 22px; height: 18px; border-radius: 4px;
+  display: grid; place-items: center;
+  color: var(--blue); background: var(--blue-soft);
+  transition: background 0.15s;
+}
+.refresh-btn:hover { background: var(--blue-soft-hover); }
+.refresh-btn svg { width: 11px; height: 11px; }
+.refresh-btn.busy svg { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* "live" indicator for widgets that update every second */
+.live {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 9px; font-family: var(--mono); font-weight: var(--thin);
+  color: var(--text-3); letter-spacing: 0.06em; white-space: nowrap;
+}
+.live .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green-glow); animation: blink 1.8s ease-in-out infinite; }
+.live.stale .dot { background: var(--gray-dot); box-shadow: none; animation: none; }
+
+/* ─── Pager (arrows + dots) ─── */
+.pager { display: flex; align-items: center; gap: 4px; }
+.pager-arrow {
+  width: 18px; height: 18px; border-radius: 4px;
+  display: grid; place-items: center;
+  color: var(--text-3);
+  transition: background 0.15s, color 0.15s, opacity 0.15s;
+}
+.pager-arrow:hover { background: var(--surface-card-hover); color: var(--text-1); }
+.pager-arrow:disabled { opacity: 0.3; pointer-events: none; }
+.pager-arrow svg { width: 10px; height: 10px; }
+.dots { display: flex; align-items: center; gap: 4px; padding: 4px 0; }
+.dots button {
+  width: 5px; height: 5px; border-radius: 3px;
+  background: var(--dot);
+  transition: width 0.25s ease, background 0.25s ease;
+}
+.dots button.active { width: 14px; background: var(--dot-active); }
+
+.empty {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: var(--text-3);
+}

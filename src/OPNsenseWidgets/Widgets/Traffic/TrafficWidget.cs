@@ -6,13 +6,57 @@ using OPNsenseWidgets.Rendering;
 
 namespace OPNsenseWidgets.Widgets.Traffic;
 
-public sealed class TrafficWidget : IWidgetDefinition
+public sealed class TrafficWidget : IWebWidgetDefinition
 {
     public string DefinitionId => "Traffic_Widget";
     public string DisplayName => "Traffic";
     public int RefreshIntervalSeconds => 1;
+    public string WebPath => "Traffic/Web/index.html";
 
-    private const int MaxHistory = 20;
+    // One sample per second; the web page charts the last 60 s.
+    private const int MaxHistory = 60;
+    private const double MaxSampleGapSeconds = 5;
+
+    /// <summary>
+    /// Per-interface history and totals for the HTML page (Web/index.html), WAN first.
+    /// Samples are [unixMs, inBps, outBps].
+    /// </summary>
+    public object BuildWebData(object? data)
+    {
+        var traffic = data as TrafficData;
+        var updatedAt = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+        if (traffic is null)
+            return new { updatedAt, interfaces = Array.Empty<object>() };
+
+        string NameOf(string key) => traffic.InterfaceNames.GetValueOrDefault(key, key);
+
+        var interfaces = traffic.InterfaceNames.Keys
+            .Union(traffic.AllHistory.Keys)
+            .OrderByDescending(k => NameOf(k) == traffic.InterfaceName)
+            .ThenByDescending(k => NameOf(k).Contains("WAN", StringComparison.OrdinalIgnoreCase))
+            .ThenBy(k => NameOf(k), StringComparer.OrdinalIgnoreCase)
+            .Select(k =>
+            {
+                var totals = traffic.Totals.GetValueOrDefault(k);
+                var samples = traffic.AllHistory.GetValueOrDefault(k) ?? [];
+                return new
+                {
+                    id = k,
+                    name = NameOf(k),
+                    isWan = NameOf(k) == traffic.InterfaceName,
+                    totalIn = totals.BytesIn,
+                    totalOut = totals.BytesOut,
+                    samples = samples.Select(s => new[]
+                    {
+                        new DateTimeOffset(s.Timestamp).ToUnixTimeMilliseconds(),
+                        Math.Round(s.InBitsPerSecond),
+                        Math.Round(s.OutBitsPerSecond)
+                    })
+                };
+            });
+
+        return new { updatedAt, interfaces };
+    }
 
     private readonly Dictionary<string, List<TrafficSample>> _allHistory = new();
     private readonly Dictionary<string, (long BytesIn, long BytesOut)> _prevBytes = new();
@@ -55,8 +99,10 @@ public sealed class TrafficWidget : IWidgetDefinition
 
         if (_prevTimestamp != default)
         {
+            // Polling stops while the board is closed. The first reading after that would average
+            // the whole gap into one misleading point, so only use it as the new baseline.
             var elapsed = (now - _prevTimestamp).TotalSeconds;
-            if (elapsed > 0)
+            if (elapsed > 0 && elapsed <= MaxSampleGapSeconds)
             {
                 foreach (var kv in stats)
                 {
@@ -112,7 +158,8 @@ public sealed class TrafficWidget : IWidgetDefinition
             TotalBytesOut = wan.BytesTransmitted,
             HasData       = _allHistory.Values.Any(h => h.Count > 0),
             AllHistory    = _allHistory.ToDictionary(kv => kv.Key, kv => kv.Value.ToList()),
-            InterfaceNames = new Dictionary<string, string>(_interfaceNames)
+            InterfaceNames = new Dictionary<string, string>(_interfaceNames),
+            Totals        = stats.ToDictionary(kv => kv.Key, kv => (kv.Value.BytesReceived, kv.Value.BytesTransmitted))
         };
         }
         finally

@@ -7,8 +7,117 @@ using OPNsenseWidgets.Rendering;
 
 namespace OPNsenseWidgets.Widgets.Firewall;
 
-public sealed class FirewallWidget : IWidgetDefinition
+public sealed class FirewallWidget : IWebWidgetDefinition
 {
+    public string WebPath => "Firewall/Web/index.html";
+
+    // Enough rules for the large view's lists; the rest only count toward the totals.
+    private const int MaxWebRules = 40;
+    private const int MaxRateHistory = 60;          // one point per second
+    private const double MaxRateGapSeconds = 5;
+
+    // Live evaluation rates, derived from consecutive fetches (pf counters are cumulative).
+    // Kept here rather than in the page so they survive the page reloading on every board open.
+    private readonly object _rateLock = new();
+    private Dictionary<string, long> _prevEvaluations = [];
+    private long _prevTotal = -1;
+    private DateTime _prevAt;
+    private Dictionary<string, double> _rates = [];
+    private double? _totalRate;
+    private readonly List<(DateTime At, double Rate)> _rateHistory = [];
+
+    private void UpdateRates(List<FirewallRuleStat> rules)
+    {
+        var now = DateTime.Now;
+        var byLabel = rules
+            .GroupBy(r => r.ShownLabel)
+            .ToDictionary(g => g.Key, g => g.Sum(r => r.Evaluations));
+        var total = byLabel.Values.Sum();
+
+        lock (_rateLock)
+        {
+            var elapsed = (now - _prevAt).TotalSeconds;
+            if (_prevTotal >= 0 && total < _prevTotal)
+            {
+                // pf counters were reset: nothing to compare against.
+                _rates = [];
+                _totalRate = null;
+            }
+            else if (_prevTotal >= 0 && elapsed > 0 && elapsed <= MaxRateGapSeconds)
+            {
+                _rates = byLabel
+                    .Where(kv => _prevEvaluations.TryGetValue(kv.Key, out var old) && kv.Value >= old)
+                    .ToDictionary(kv => kv.Key, kv => (kv.Value - _prevEvaluations[kv.Key]) / elapsed);
+                _totalRate = (total - _prevTotal) / elapsed;
+                _rateHistory.Add((now, _totalRate.Value));
+                if (_rateHistory.Count > MaxRateHistory)
+                    _rateHistory.RemoveAt(0);
+            }
+            // Otherwise (first fetch, or polling paused while the board was closed) keep the last
+            // known rates for one more second instead of averaging the whole gap.
+
+            _prevEvaluations = byLabel;
+            _prevTotal = total;
+            _prevAt = now;
+        }
+    }
+
+    /// <summary>
+    /// Rule counters for the HTML page (Web/index.html), merged by label and sorted by evaluations,
+    /// with live per-second rates (null until two fetches have been compared) and 60 s of total rate
+    /// history as [unixMs, evalsPerSecond].
+    /// </summary>
+    public object BuildWebData(object? data)
+    {
+        var rules = data as List<FirewallRuleStat> ?? [];
+
+        Dictionary<string, double> rates;
+        double? totalRate;
+        List<double[]> history;
+        lock (_rateLock)
+        {
+            rates = _rates;
+            totalRate = _totalRate;
+            history = _rateHistory
+                .Select(h => new[] { new DateTimeOffset(h.At).ToUnixTimeMilliseconds(), Math.Round(h.Rate, 1) })
+                .ToList();
+        }
+
+        // Rules that read the same (e.g. the IPv4 and IPv6 variants of one rule) are merged;
+        // "rule" keeps the raw pf text for the tooltip.
+        var merged = rules
+            .GroupBy(r => r.ShownLabel)
+            .Select(g => new
+            {
+                label = g.Key,
+                rule = string.Join("\n", g.Select(r => r.EffectiveLabel).Distinct().Take(3)),
+                evaluations = g.Sum(r => r.Evaluations),
+                packets = g.Sum(r => r.Packets),
+                bytes = g.Sum(r => r.Bytes),
+                states = g.Sum(r => r.States),
+                rate = rates.TryGetValue(g.Key, out var ruleRate) ? Math.Round(ruleRate, 1) : (double?)null
+            })
+            .OrderByDescending(r => r.evaluations)
+            .ThenByDescending(r => r.packets)
+            .ToList();
+
+        return new
+        {
+            updatedAt = DateTimeOffset.Now.ToUnixTimeMilliseconds(),
+            ruleCount = merged.Count,
+            rate = totalRate is null ? (double?)null : Math.Round(totalRate.Value, 1),
+            rateHistory = history,
+            totals = new
+            {
+                evaluations = merged.Sum(r => r.evaluations),
+                packets = merged.Sum(r => r.packets),
+                bytes = merged.Sum(r => r.bytes),
+                states = merged.Sum(r => r.states)
+            },
+            rules = merged.Take(MaxWebRules)
+        };
+    }
+
     private readonly ILogger<FirewallWidget> _logger;
 
     public FirewallWidget(ILogger<FirewallWidget> logger)
@@ -29,6 +138,8 @@ public sealed class FirewallWidget : IWidgetDefinition
 
     // Device names returned by GetInterfaceStatisticsAsync (same set Traffic widget uses), cached for 60 s.
     private HashSet<string> _trackedDevices = [];
+    // Device -> OPNsense interface name (vmx0 -> WAN), for readable rule labels.
+    private Dictionary<string, string> _interfaceNames = new(StringComparer.OrdinalIgnoreCase);
     private DateTime _devicesFetchedAt = DateTime.MinValue;
 
     // UUID → description map from the rule list API, cached for 60 s.
@@ -58,6 +169,7 @@ public sealed class FirewallWidget : IWidgetDefinition
                 var ifaces = await client.GetInterfaceStatisticsAsync(ct);
                 _trackedDevices = ifaces.Keys
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                _interfaceNames = ifaces.ToDictionary(kv => kv.Key, kv => kv.Value.Name, StringComparer.OrdinalIgnoreCase);
                 _devicesFetchedAt = DateTime.Now;
                 _logger.LogDebug("FirewallWidget: tracked devices={TrackedDevices}", string.Join(",", _trackedDevices));
             }
@@ -98,10 +210,14 @@ public sealed class FirewallWidget : IWidgetDefinition
             ? resolved.Where(r => RuleAppliesToTrackedInterface(r.Description, _trackedDevices)).ToList()
             : resolved;
 
-        return rules
+        var sorted = rules
             .OrderByDescending(r => r.Evaluations)
             .ThenByDescending(r => r.Packets)
             .ToList();
+        foreach (var rule in sorted)
+            rule.DisplayLabel = PfRuleLabel.Pretty(rule.EffectiveLabel, _interfaceNames);
+        UpdateRates(sorted);
+        return sorted;
     }
 
     /// <summary>
@@ -177,7 +293,7 @@ public sealed class FirewallWidget : IWidgetDefinition
         var rest = ordered.Skip(topN).ToList();
 
         var sliceValues = primary.Select(r => (double)r.Evaluations).ToList();
-        var sliceLabels = primary.Select(r => r.EffectiveLabel).ToList();
+        var sliceLabels = primary.Select(r => r.ShownLabel).ToList();
 
         if (rest.Count > 0)
         {

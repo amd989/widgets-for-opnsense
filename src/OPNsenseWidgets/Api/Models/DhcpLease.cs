@@ -61,6 +61,18 @@ public sealed class DhcpLease
     [JsonPropertyName("is_reserved")]
     public string IsReserved { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Has a fixed address: the API's own flag, an ISC static mapping, or a KEA reservation
+    /// (set by DhcpLeasesWidget from the reservations API, since KEA's lease list doesn't flag them).
+    /// </summary>
+    [JsonIgnore]
+    public bool Reserved { get; set; }
+
+    [JsonIgnore]
+    public bool ReservedByApi =>
+        IsReserved is "1" or "true" or "True" ||
+        Type.Equals("static", StringComparison.OrdinalIgnoreCase);
+
     // Normalized accessors — prefer KEA fields if ISC fields are empty
     [JsonIgnore]
     public string EffectiveMac => !string.IsNullOrEmpty(Mac) ? Mac : HwAddr;

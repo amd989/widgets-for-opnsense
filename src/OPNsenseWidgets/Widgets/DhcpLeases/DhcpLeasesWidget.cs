@@ -10,11 +10,38 @@ public sealed class DhcpLeasesWidget : IWebWidgetDefinition
 {
     public string DefinitionId => "DhcpLeases_Widget";
     public string DisplayName => "DHCP Leases";
-    public string WebPath => "DhcpLeases/index.html";
+    public string WebPath => "DhcpLeases/Web/index.html";
+
+    /// <summary>A device counts as new for this long after it first appeared.</summary>
+    public static readonly TimeSpan NewWindow = TimeSpan.FromHours(24);
+    /// <summary>A lease renewed within this window means the device is online.</summary>
+    public static readonly TimeSpan ActiveWindow = TimeSpan.FromHours(1);
+
+    private readonly FirstSeenStore _firstSeenStore;
+
+    // KEA reservations change rarely; refresh them once a minute.
+    private static readonly TimeSpan ReservationsTtl = TimeSpan.FromSeconds(60);
+    private (HashSet<string> Macs, HashSet<string> Ips) _reservations = ([], []);
+    private DateTime _reservationsFetchedAt = DateTime.MinValue;
+    private IReadOnlyDictionary<string, DateTimeOffset?> _firstSeen = new Dictionary<string, DateTimeOffset?>();
+
+    public DhcpLeasesWidget(FirstSeenStore firstSeenStore)
+    {
+        _firstSeenStore = firstSeenStore;
+    }
+
+    /// <summary>When the device first appeared; null if unknown or present before tracking started.</summary>
+    private DateTimeOffset? FirstSeenOf(DhcpLease lease) =>
+        !string.IsNullOrWhiteSpace(lease.EffectiveMac) &&
+        _firstSeen.TryGetValue(FirstSeenStore.Normalize(lease.EffectiveMac), out var seen) ? seen : null;
+
+    private bool IsNew(DhcpLease lease, DateTimeOffset now) =>
+        FirstSeenOf(lease) is { } seen && now - seen < NewWindow;
 
     /// <summary>
-    /// Raw lease data for the HTML page (Web/index.html). The page derives status, relative
-    /// times and the 24h histogram itself so they stay current between refreshes.
+    /// Lease data for the HTML page (Web/index.html), newest arrivals first. The page derives
+    /// status, relative times and the 24h arrivals chart itself so they stay current between refreshes.
+    /// firstSeen is null for devices present before tracking started (trackingSince).
     /// </summary>
     public object BuildWebData(object? data)
     {
@@ -22,6 +49,9 @@ public sealed class DhcpLeasesWidget : IWebWidgetDefinition
         return new
         {
             updatedAt = DateTimeOffset.Now.ToUnixTimeMilliseconds(),
+            trackingSince = _firstSeenStore.TrackingSince.ToUnixTimeMilliseconds(),
+            newWindowMs = (long)NewWindow.TotalMilliseconds,
+            activeWindowMs = (long)ActiveWindow.TotalMilliseconds,
             total = leases.Count,
             leases = leases.Select(l => new
             {
@@ -32,13 +62,13 @@ public sealed class DhcpLeasesWidget : IWebWidgetDefinition
                 start = l.EffectiveLeaseStart == DateTime.MinValue
                     ? (long?)null
                     : new DateTimeOffset(l.EffectiveLeaseStart).ToUnixTimeMilliseconds(),
-                reserved = l.IsReserved == "1"
+                firstSeen = FirstSeenOf(l)?.ToUnixTimeMilliseconds(),
+                reserved = l.Reserved
             })
         };
     }
 
     private const int MaxPages = 5;
-    private readonly List<(DateTime Time, int Count)> _history = [];
 
     private static readonly Dictionary<string, int> CardsPerPage = new()
     {
@@ -61,9 +91,37 @@ public sealed class DhcpLeasesWidget : IWebWidgetDefinition
     public async Task<object?> FetchDataAsync(OPNsenseApiClient client, CancellationToken ct = default)
     {
         var response = await client.GetLeasesAsync(page: 1, rowCount: 100, ct: ct);
+        _firstSeen = _firstSeenStore.Observe(response.Rows.Select(l => l.EffectiveMac));
+
+        if (DateTime.Now - _reservationsFetchedAt > ReservationsTtl)
+        {
+            _reservations = await client.GetReservationsAsync(ct);
+            _reservationsFetchedAt = DateTime.Now;
+        }
+        foreach (var lease in response.Rows)
+        {
+            lease.Reserved = lease.ReservedByApi ||
+                (!string.IsNullOrWhiteSpace(lease.EffectiveMac) && _reservations.Macs.Contains(FirstSeenStore.Normalize(lease.EffectiveMac))) ||
+                _reservations.Ips.Contains(lease.Address);
+        }
+
+        // Newest arrivals first; devices that predate tracking follow, most recently renewed first.
         return response.Rows
-            .OrderByDescending(l => l.EffectiveLeaseStart)
+            .OrderByDescending(l => FirstSeenOf(l) ?? DateTimeOffset.MinValue)
+            .ThenByDescending(l => l.EffectiveLeaseStart)
             .ToList();
+    }
+
+    /// <summary>
+    /// Card time: how long ago the device joined. Devices that predate tracking show the tracking
+    /// age with a "+" ("3d+" = at least 3 days), or nothing during the first hour of tracking.
+    /// </summary>
+    private string JoinedLabel(DhcpLease lease, DateTimeOffset now)
+    {
+        if (FirstSeenOf(lease) is { } seen)
+            return FormatRelativeTime(seen.LocalDateTime, now.LocalDateTime);
+        var tracking = now - _firstSeenStore.TrackingSince;
+        return tracking.TotalHours < 1 ? "" : FormatRelativeTime(_firstSeenStore.TrackingSince.LocalDateTime, now.LocalDateTime) + "+";
     }
 
     public string BuildDataJson(object? data, string size)
@@ -74,9 +132,10 @@ public sealed class DhcpLeasesWidget : IWebWidgetDefinition
         var maxCards = cardsPerPage * MaxPages;
         var displayLeases = leases.Take(maxCards).ToList();
 
-        var newCount = leases.Count(l => (now - l.EffectiveLeaseStart).TotalMinutes < 5);
-        var activeCount = leases.Count(l => (now - l.EffectiveLeaseStart).TotalHours < 1);
-        var reservedCount = leases.Count(l => l.IsReserved == "1");
+        var nowOffset = DateTimeOffset.Now;
+        var newCount = leases.Count(l => IsNew(l, nowOffset));
+        var activeCount = leases.Count(l => now - l.EffectiveLeaseStart < ActiveWindow);
+        var reservedCount = leases.Count(l => l.Reserved);
 
         var showMac = size == "large";
         var columns = size == "small" ? 1 : 2;
@@ -89,18 +148,17 @@ public sealed class DhcpLeasesWidget : IWebWidgetDefinition
             var metaParts = new List<string>();
             if (hasHostname) metaParts.Add(l.Address);
             if (!string.IsNullOrEmpty(vendor)) metaParts.Add(vendor);
-            if (l.IsReserved == "1") metaParts.Add("rsv");
+            if (l.Reserved) metaParts.Add("rsv");
 
-            var age = now - l.EffectiveLeaseStart;
-            var status = l.IsReserved == "1" ? "reserved"
-                : age.TotalMinutes < 5 ? "new"
-                : age.TotalHours < 1 ? "active"
+            var status = l.Reserved ? "reserved"
+                : IsNew(l, nowOffset) ? "new"
+                : now - l.EffectiveLeaseStart < ActiveWindow ? "active"
                 : "stale";
 
             var cardData = new DeviceCardData(
                 Hostname: hasHostname ? l.Hostname : l.Address,
                 Meta: string.Join(" \u00b7 ", metaParts),
-                Time: FormatRelativeTime(l.EffectiveLeaseStart, now),
+                Time: JoinedLabel(l, nowOffset),
                 Mac: showMac ? l.EffectiveMac : null,
                 Status: status
             );
@@ -143,7 +201,7 @@ public sealed class DhcpLeasesWidget : IWebWidgetDefinition
             reservedCount,
             lastRefresh = now.ToString("h:mm tt"),
             pages,
-            sparkline = BuildSparkline(leases.Count, now)
+            sparkline = BuildArrivalsSparkline(leases, nowOffset)
         };
 
         return JsonSerializer.Serialize(result);
@@ -176,19 +234,16 @@ public sealed class DhcpLeasesWidget : IWebWidgetDefinition
         return vendor;
     }
 
-    private string BuildSparkline(int currentCount, DateTime now)
+    /// <summary>Devices first seen per hour over the last 24h; buckets[23] is the current hour.</summary>
+    private string BuildArrivalsSparkline(List<DhcpLease> leases, DateTimeOffset now)
     {
-        _history.Add((now, currentCount));
-        _history.RemoveAll(h => (now - h.Time).TotalHours > 25);
-
-        // buckets[0] = 24h ago, buckets[23] = now
         var buckets = new int[24];
-        foreach (var (time, count) in _history)
+        foreach (var lease in leases)
         {
-            var age = now - time;
-            if (age.TotalHours >= 24) continue;
-            var slot = 23 - (int)age.TotalHours;
-            buckets[slot] = Math.Max(buckets[slot], count);
+            if (FirstSeenOf(lease) is not { } seen) continue;
+            var hoursAgo = (int)Math.Floor((now - seen).TotalHours);
+            if (hoursAgo is >= 0 and < 24)
+                buckets[23 - hoursAgo]++;
         }
 
         return SparklineRenderer.Render(buckets);
