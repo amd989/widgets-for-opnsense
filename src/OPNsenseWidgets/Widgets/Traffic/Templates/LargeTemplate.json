@@ -70,7 +70,6 @@
       "type": "Image",
       "url": "${downloadChart}",
       "size": "Stretch",
-      "height": "145px",
       "spacing": "None",
       "$when": "${sampleCount > 1}"
     },
@@ -87,7 +86,6 @@
       "type": "Image",
       "url": "${uploadChart}",
       "size": "Stretch",
-      "height": "145px",
       "spacing": "None",
       "$when": "${sampleCount > 1}"
     },

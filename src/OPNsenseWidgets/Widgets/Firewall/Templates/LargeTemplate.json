@@ -12,8 +12,8 @@
         {
           "type": "Image",
           "url": "${donutImage}",
-          "width": "200px",
-          "height": "200px",
+          "width": "225px",
+          "height": "225px",
           "horizontalAlignment": "Center",
           "spacing": "None"
         }
@@ -37,20 +37,7 @@
           "items": [
             {
               "type": "TextBlock",
-              "text": "${totalEvaluations} evaluations",
-              "size": "Small",
-              "isSubtle": true,
-              "spacing": "None"
-            }
-          ]
-        },
-        {
-          "type": "Column",
-          "width": "stretch",
-          "items": [
-            {
-              "type": "TextBlock",
-              "text": "${totalPackets} packets",
+              "text": "${evaluationsShort} evaluations · ${packetsShort} packets",
               "size": "Small",
               "isSubtle": true,
               "spacing": "None"
@@ -74,7 +61,7 @@
     },
     {
       "type": "TextBlock",
-      "text": "No firewall activity yet\u2026",
+      "text": "No firewall activity yet…",
       "size": "Small",
       "isSubtle": true,
       "$when": "${!hasData}"

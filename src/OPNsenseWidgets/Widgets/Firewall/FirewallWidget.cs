@@ -22,7 +22,7 @@ public sealed class FirewallWidget : IWidgetDefinition
 
     private static readonly Dictionary<string, int> TopNPerSize = new()
     {
-        ["small"] = 3,
+        ["small"] = 4,
         ["medium"] = 5,
         ["large"] = 10
     };
@@ -207,9 +207,9 @@ public sealed class FirewallWidget : IWidgetDefinition
 
         var (donutSize, ringThickness, legendWidth, legendRowH, legendTextSize, legendColumns) = size switch
         {
-            "small"  => (90,  18f, 0,   22, 12f, 1),
-            "large"  => (200, 42f, 320, 22, 12f, 2),
-            _        => (130, 30f, 290, 20, 11f, 1),  // medium: stacked, full-width legend
+            "small"  => (108, 24f, 0,   22, 12f, 1),
+            "large"  => (225, 46f, 320, 25, 12f, 2),
+            _        => (110, 26f, 290, 18, 11f, 1),  // medium: stacked, full-width legend
         };
 
         var donutImage = DonutChartRenderer.RenderDonut(
@@ -240,7 +240,19 @@ public sealed class FirewallWidget : IWidgetDefinition
             topRules,
             totalEvaluations = grandEvaluations.ToString("N0"),
             totalPackets = grandPackets.ToString("N0"),
+            evaluationsShort = FormatCompact(grandEvaluations),
+            packetsShort = FormatCompact(grandPackets),
             ruleCount = rules.Count
         });
     }
+
+    // 966269802 -> "966.3M" so footers fit on one line
+    private static string FormatCompact(long value) => value switch
+    {
+        >= 1_000_000_000_000 => $"{value / 1e12:F1}T",
+        >= 1_000_000_000     => $"{value / 1e9:F1}B",
+        >= 1_000_000         => $"{value / 1e6:F1}M",
+        >= 1_000             => $"{value / 1e3:F1}K",
+        _                    => value.ToString()
+    };
 }

@@ -79,8 +79,10 @@ public sealed class DhcpLeasesWidget : IWidgetDefinition
                 Status: status
             );
 
-            var compact = size == "small";
-            return new { img = DeviceCardRenderer.RenderCard(cardData, cardLogicalWidth, showMac, compact) };
+            // Small: regular card, no MAC line. A taller card makes the carousel overflow
+            // and the Widget Board then hides it entirely. The side inset keeps the
+            // carousel arrows off the text.
+            return new { img = DeviceCardRenderer.RenderCard(cardData, cardLogicalWidth, showMac, insetX: size == "small" ? 22 : 0) };
         }).ToList();
 
         var pages = new List<object>();

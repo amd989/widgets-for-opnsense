@@ -14,10 +14,13 @@ public static class DeviceCardRenderer
         ["stale"] = new SKColor(255, 255, 255, 31), // subtle gray
     };
 
-    public static string RenderCard(DeviceCardData d, int logicalWidth, bool showMac = false, bool compact = false)
+    /// <param name="insetX">Transparent margin (logical px) on each side, e.g. to keep carousel arrows off the text.</param>
+    public static string RenderCard(DeviceCardData d, int logicalWidth, bool showMac = false, bool compact = false, int insetX = 0)
     {
         const int scale = 3;
-        var width = logicalWidth * scale;
+        var imageWidth = logicalWidth * scale;
+        var inset = insetX * scale;
+        var width = imageWidth - inset * 2;
         var padH = (compact ? 8 : 10) * scale;
         var padV = (compact ? 6 : 10) * scale;
         const float radius = 6f * scale;
@@ -33,9 +36,10 @@ public static class DeviceCardRenderer
         if (hasMeta) height += (int)subTextSize + lineGap;
         if (hasMac) height += (int)macTextSize + lineGap;
 
-        using var surface = SKSurface.Create(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul));
+        using var surface = SKSurface.Create(new SKImageInfo(imageWidth, height, SKColorType.Rgba8888, SKAlphaType.Premul));
         var canvas = surface.Canvas;
         canvas.Clear(SKColors.Transparent);
+        canvas.Translate(inset, 0);
 
         using var bg = new SKPaint
         {

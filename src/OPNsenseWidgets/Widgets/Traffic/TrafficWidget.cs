@@ -170,10 +170,10 @@ public sealed class TrafficWidget : IWidgetDefinition
                 .ToList();
 
             var downloadChart = downloadSeries.Count > 0
-                ? TrafficChartRenderer.RenderMultiSeries(downloadSeries, width: 450, height: 145)
+                ? TrafficChartRenderer.RenderMultiSeries(downloadSeries, width: 450, height: 230)
                 : "";
             var uploadChart = uploadSeries.Count > 0
-                ? TrafficChartRenderer.RenderMultiSeries(uploadSeries, width: 450, height: 145)
+                ? TrafficChartRenderer.RenderMultiSeries(uploadSeries, width: 450, height: 230)
                 : "";
 
             var legendLabels = orderedKeys
@@ -205,7 +205,7 @@ public sealed class TrafficWidget : IWidgetDefinition
                 ? TrafficChartRenderer.Render(
                     traffic.History.Select(s => s.InBitsPerSecond).ToArray(),
                     traffic.History.Select(s => s.OutBitsPerSecond).ToArray(),
-                    width: 450, height: 32)
+                    width: 450, height: 112)
                 : "";
 
             return JsonSerializer.Serialize(new
@@ -227,7 +227,7 @@ public sealed class TrafficWidget : IWidgetDefinition
             ? TrafficChartRenderer.Render(
                 traffic.History.Select(s => s.InBitsPerSecond).ToArray(),
                 traffic.History.Select(s => s.OutBitsPerSecond).ToArray(),
-                width: 450, height: 90)
+                width: 450, height: 140)
             : "";
 
         // Find LAN: prefer name containing "LAN", else first non-WAN interface
@@ -250,7 +250,7 @@ public sealed class TrafficWidget : IWidgetDefinition
             ? TrafficChartRenderer.Render(
                 lanHistory.Select(s => s.InBitsPerSecond).ToArray(),
                 lanHistory.Select(s => s.OutBitsPerSecond).ToArray(),
-                width: 450, height: 95)
+                width: 450, height: 140)
             : "";
         var lanSampleCount = lanHistory?.Count ?? 0;
 
@@ -283,6 +283,7 @@ public sealed class TrafficWidget : IWidgetDefinition
     {
         return bytes switch
         {
+            >= 1_099_511_627_776L => $"{(double)bytes / 1_099_511_627_776:F2} TB",
             >= 1_073_741_824L => $"{(double)bytes / 1_073_741_824:F1} GB",
             >= 1_048_576L     => $"{(double)bytes / 1_048_576:F1} MB",
             >= 1024L          => $"{(double)bytes / 1024:F0} KB",

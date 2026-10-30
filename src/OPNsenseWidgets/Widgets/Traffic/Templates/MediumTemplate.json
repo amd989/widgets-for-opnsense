@@ -62,7 +62,6 @@
       "type": "Image",
       "url": "${chartImage}",
       "size": "Stretch",
-      "height": "90px",
       "spacing": "None",
       "$when": "${sampleCount > 1}"
     },
@@ -79,7 +78,6 @@
       "type": "Image",
       "url": "${lanChart}",
       "size": "Stretch",
-      "height": "90px",
       "spacing": "None",
       "$when": "${lanSampleCount > 1}"
     },
