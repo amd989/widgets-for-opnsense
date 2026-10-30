@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DHCP Leases</title>
+<!--
+  DHCP Leases widget page, based on design/widget-mockup.html.
+  Served by the provider from the exe at https://opnsense-widget.test/DhcpLeases/index.html.
+  Data arrives as {type:"data", size, payload} messages; the page posts {type:"ready"} on load
+  and {type:"refresh"} from the footer button. Opened in a normal browser it shows demo data
+  (add ?size=small|medium|large).
+-->
+<style>
+  :root {
+    color-scheme: dark light;
+    --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    --mono: "Cascadia Mono", "Cascadia Code", Consolas, monospace;
+
+    --surface-card: rgba(255, 255, 255, 0.035);
+    --surface-card-hover: rgba(255, 255, 255, 0.06);
+    --border: rgba(255, 255, 255, 0.06);
+    --border-card: rgba(255, 255, 255, 0.07);
+
+    --text-1: #eaecf2;
+    --text-2: rgba(234, 236, 242, 0.58);
+    --text-3: rgba(234, 236, 242, 0.34);
+    --text-mono: rgba(176, 190, 220, 0.78);
+
+    --green: #2dd4a0;
+    --green-glow: rgba(45, 212, 160, 0.25);
+    --spark-rgb: 45, 212, 160;
+    --spark-none: rgba(255, 255, 255, 0.04);
+
+    --blue: #5ba3ff;
+    --blue-soft: rgba(91, 163, 255, 0.10);
+    --blue-soft-hover: rgba(91, 163, 255, 0.18);
+    --blue-glow: rgba(91, 163, 255, 0.20);
+
+    --purple: #9b87f5;
+    --purple-soft: rgba(155, 135, 245, 0.10);
+
+    --gray-dot: rgba(255, 255, 255, 0.14);
+    --scroll-thumb: rgba(255, 255, 255, 0.14);
+
+    /* The board draws its title bar over the top of the web view. */
+    --title-bar: 44px;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --surface-card: rgba(0, 0, 0, 0.03);
+      --surface-card-hover: rgba(0, 0, 0, 0.055);
+      --border: rgba(0, 0, 0, 0.07);
+      --border-card: rgba(0, 0, 0, 0.07);
+
+      --text-1: #1b1d24;
+      --text-2: rgba(27, 29, 36, 0.62);
+      --text-3: rgba(27, 29, 36, 0.42);
+      --text-mono: rgba(38, 56, 96, 0.82);
+
+      --green: #0e9f74;
+      --green-glow: rgba(14, 159, 116, 0.22);
+      --spark-rgb: 14, 159, 116;
+      --spark-none: rgba(0, 0, 0, 0.05);
+
+      --blue: #2f7de1;
+      --blue-soft: rgba(47, 125, 225, 0.10);
+      --blue-soft-hover: rgba(47, 125, 225, 0.18);
+      --blue-glow: rgba(47, 125, 225, 0.22);
+
+      --purple: #7a63e0;
+      --purple-soft: rgba(122, 99, 224, 0.10);
+
+      --gray-dot: rgba(0, 0, 0, 0.16);
+      --scroll-thumb: rgba(0, 0, 0, 0.16);
+    }
+  }
+
+  /* Preview outside the board only (the widget page itself is transparent). */
+  html.preview { background: #272727; }
+  @media (prefers-color-scheme: light) { html.preview { background: #f3f3f3; } }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: transparent;
+    color: var(--text-1);
+    font-family: var(--font);
+    overflow: hidden;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: var(--title-bar) 16px 12px;
+  }
+
+  /* ─── Header ─── */
+  .header-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .header-left { display: flex; flex-direction: column; min-width: 0; }
+  .header-right {
+    font-size: 10px;
+    font-family: var(--mono);
+    font-weight: 300;
+    color: var(--text-3);
+    padding-bottom: 2px;
+    white-space: nowrap;
+  }
+
+  .hero { display: flex; align-items: baseline; gap: 6px; margin-bottom: 2px; }
+  .hero-num {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .hero-unit { font-size: 12px; color: var(--text-2); letter-spacing: 0.02em; }
+
+  .sub-stats { display: flex; gap: 12px; margin-bottom: 12px; }
+  .sub-stat {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 10px; color: var(--text-2); white-space: nowrap;
+  }
+  .sub-stat .dot { width: 5px; height: 5px; border-radius: 50%; }
+  .sub-stat .dot.g { background: var(--green); box-shadow: 0 0 6px var(--green-glow); }
+  .sub-stat .dot.b { background: var(--blue); animation: blink 1.8s ease-in-out infinite; }
+  .sub-stat .num { font-weight: 600; color: var(--text-1); font-variant-numeric: tabular-nums; }
+  .sub-stat.reserved, .sub-stat.reserved .num { color: var(--purple); }
+
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  /* ─── Activity sparkline ─── */
+  .spark { flex-shrink: 0; }
+  .spark-row {
+    height: 20px;
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    padding: 0 1px;
+  }
+  .spark-bar {
+    flex: 1;
+    border-radius: 1.5px 1.5px 0 0;
+    min-height: 2px;
+    transition: height 0.4s ease, background-color 0.4s ease;
+  }
+  .spark-bar.none { background: var(--spark-none); height: 2px; }
+  .spark-bar.low  { background: rgba(var(--spark-rgb), 0.16); height: 4px; }
+  .spark-bar.med  { background: rgba(var(--spark-rgb), 0.26); height: 8px; }
+  .spark-bar.high { background: rgba(var(--spark-rgb), 0.42); height: 13px; }
+  .spark-bar.hot  { background: var(--green); height: 18px; box-shadow: 0 0 8px var(--green-glow); }
+  .spark-label {
+    display: flex; justify-content: space-between;
+    font-size: 8px; color: var(--text-3); margin-top: 3px;
+    font-family: var(--mono); font-weight: 300; letter-spacing: 0.06em;
+  }
+
+  /* ─── Device cards ─── */
+  .grid {
+    flex: 1;
+    min-height: 0;
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-auto-rows: max-content; /* keep cards full height when the list overflows */
+    gap: 6px;
+    align-content: start;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scroll-thumb) transparent;
+  }
+  .grid.overflowing {
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
+    padding-bottom: 12px;
+  }
+  .grid::-webkit-scrollbar { width: 4px; }
+  .grid::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 2px; }
+  .grid::-webkit-scrollbar-track { background: transparent; }
+
+  .dev-card {
+    background: var(--surface-card);
+    border: 1px solid var(--border-card);
+    border-radius: 8px;
+    padding: 9px 10px 8px;
+    position: relative;
+    overflow: hidden;
+    min-width: 0;
+    transition: background 0.15s;
+    animation: card-in 0.25s ease both;
+  }
+  .dev-card:hover { background: var(--surface-card-hover); }
+  @keyframes card-in { from { opacity: 0; transform: translateY(3px); } }
+
+  /* Accent stripe */
+  .dev-card::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 6px; bottom: 6px;
+    width: 2px;
+    border-radius: 1px;
+  }
+  .status-new::before { background: var(--blue); box-shadow: 0 0 8px var(--blue-glow); }
+  .status-active::before { background: var(--green); box-shadow: 0 0 6px var(--green-glow); }
+  .status-stale::before { background: var(--gray-dot); }
+  .status-reserved::before { background: var(--purple); }
+
+  .card-top {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 4px; margin-bottom: 3px;
+  }
+  .card-host {
+    font-size: 11.5px; font-weight: 600; letter-spacing: 0.01em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+  }
+  .status-new .card-host { color: var(--blue); }
+  .card-time {
+    font-size: 9px; font-family: var(--mono); font-weight: 300;
+    color: var(--text-3); flex-shrink: 0; letter-spacing: 0.04em;
+  }
+  .status-new .card-time { color: var(--blue); opacity: 0.75; }
+
+  .card-meta {
+    display: flex; align-items: center; min-width: 0;
+    font-size: 9.5px; color: var(--text-2); letter-spacing: 0.02em;
+  }
+  .card-ip {
+    font-family: var(--mono); font-size: 9px; color: var(--text-mono);
+    letter-spacing: 0.03em; flex-shrink: 0;
+  }
+  .card-sep { margin: 0 4px; color: var(--text-3); font-size: 6px; flex-shrink: 0; }
+  .card-vendor {
+    font-size: 9px; color: var(--text-2);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+  }
+  .card-mac {
+    font-family: var(--mono); font-weight: 300; font-size: 8.5px;
+    color: var(--text-3); letter-spacing: 0.04em; margin-top: 2px;
+  }
+  .card-reserved {
+    position: absolute; top: 5px; right: 5px;
+    font-size: 7px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--purple); background: var(--purple-soft);
+    padding: 1px 4px; border-radius: 3px;
+  }
+  .status-reserved .card-time { margin-right: 26px; }
+
+  .empty {
+    grid-column: 1 / -1;
+    padding: 18px 0;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-3);
+  }
+
+  /* ─── Footer ─── */
+  .footer {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 10px; padding-top: 8px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .footer-count { font-size: 9px; color: var(--text-3); letter-spacing: 0.04em; }
+  .refresh-btn {
+    font: 500 9px var(--font);
+    color: var(--blue);
+    background: var(--blue-soft);
+    border: none;
+    padding: 3px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transition: background 0.15s, opacity 0.15s;
+  }
+  .refresh-btn:hover { background: var(--blue-soft-hover); }
+  .refresh-btn.busy { opacity: 0.55; pointer-events: none; }
+
+  /* ─── Small: compact single column ─── */
+  .size-small .app { padding-left: 12px; padding-right: 12px; }
+  .size-small .hero-num { font-size: 24px; }
+  .size-small .hero-unit { font-size: 10px; }
+  .size-small .sub-stats { margin-bottom: 8px; }
+  .size-small .header-right,
+  .size-small .spark,
+  .size-small .footer,
+  .size-small .sub-stat.active,
+  .size-small .card-sep,
+  .size-small .card-vendor,
+  .size-small .card-reserved { display: none; }
+  /* The board's small size is wide and short, so lay compact cards side by side when they fit. */
+  .size-small .grid { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 4px; margin-top: 0; }
+  .size-small .dev-card { border-radius: 6px; padding: 6px 8px 5px; }
+  .size-small .dev-card::before { top: 4px; bottom: 4px; }
+  .size-small .card-top { margin-bottom: 1px; }
+  .size-small .card-host { font-size: 10.5px; }
+  .size-small .card-ip { font-size: 8.5px; opacity: 0.7; }
+  .size-small .status-reserved .card-time { margin-right: 0; }
+
+  /* Reserved count and MAC line are large-only. */
+  body:not(.size-large) .sub-stat.reserved,
+  body:not(.size-large) .card-mac { display: none; }
+
+  .loading .hero-num, .loading .sub-stats, .loading .spark-row { opacity: 0.35; }
+</style>
+</head>
+<body class="size-medium loading">
+  <div class="app">
+    <div class="header-row">
+      <div class="header-left">
+        <div class="hero">
+          <span class="hero-num" id="total">0</span>
+          <span class="hero-unit" id="unit">devices</span>
+        </div>
+        <div class="sub-stats">
+          <div class="sub-stat new"><div class="dot b"></div><span class="num" id="new-count">0</span> new</div>
+          <div class="sub-stat active"><div class="dot g"></div><span class="num" id="active-count">0</span> active</div>
+          <div class="sub-stat reserved"><span class="num" id="reserved-count">0</span> reserved</div>
+        </div>
+      </div>
+      <span class="header-right" id="updated"></span>
+    </div>
+
+    <div class="spark">
+      <div class="spark-row" id="spark"></div>
+      <div class="spark-label"><span>24h ago</span><span>now</span></div>
+    </div>
+
+    <div class="grid" id="grid"><div class="empty">Loading leases</div></div>
+
+    <div class="footer">
+      <span class="footer-count" id="footer-count"></span>
+      <button class="refresh-btn" id="refresh" type="button">Refresh</button>
+    </div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+
+  const NEW_MS = 5 * 60 * 1000;      // matches DhcpLeasesWidget: < 5 min = new
+  const ACTIVE_MS = 60 * 60 * 1000;  // < 1 h = active
+  const HOUR_MS = 60 * 60 * 1000;
+
+  const bridge = window.chrome && window.chrome.webview;
+  const $ = id => document.getElementById(id);
+  const sparkRow = $("spark");
+  const grid = $("grid");
+  const refreshBtn = $("refresh");
+
+  let state = null; // { size, payload }
+
+  for (let i = 0; i < 24; i++) {
+    const bar = document.createElement("div");
+    bar.className = "spark-bar none";
+    sparkRow.appendChild(bar);
+  }
+
+  function post(message) {
+    if (bridge) bridge.postMessage(JSON.stringify(message));
+  }
+
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = text;
+    return node;
+  }
+
+  function relativeTime(start, now) {
+    if (start == null) return "";
+    const s = Math.max(0, (now - start) / 1000);
+    if (s < 60) return "now";
+    if (s < 3600) return Math.floor(s / 60) + "m";
+    if (s < 86400) return Math.floor(s / 3600) + "h";
+    return Math.floor(s / 86400) + "d";
+  }
+
+  function statusOf(lease, now) {
+    if (lease.reserved) return "reserved";
+    if (lease.start == null) return "stale";
+    const age = now - lease.start;
+    if (age < NEW_MS) return "new";
+    if (age < ACTIVE_MS) return "active";
+    return "stale";
+  }
+
+  function sizeFromViewport() {
+    if (innerWidth < 220 || innerHeight < 220) return "small";
+    return innerHeight > 420 ? "large" : "medium";
+  }
+
+  function renderSpark(leases, now) {
+    // Leases started (or renewed) per hour over the last 24h; index 23 = the current hour.
+    const buckets = new Array(24).fill(0);
+    for (const lease of leases) {
+      if (lease.start == null) continue;
+      const hoursAgo = Math.floor((now - lease.start) / HOUR_MS);
+      if (hoursAgo >= 0 && hoursAgo < 24) buckets[23 - hoursAgo]++;
+    }
+    const max = Math.max(...buckets);
+    buckets.forEach((count, i) => {
+      const ratio = max ? count / max : 0;
+      const level = count === 0 ? "none"
+        : ratio > 0.85 ? "hot"
+        : ratio > 0.5 ? "high"
+        : ratio > 0.25 ? "med"
+        : "low";
+      const bar = sparkRow.children[i];
+      bar.className = "spark-bar " + level;
+      bar.title = count + (count === 1 ? " lease" : " leases") + ", " + (23 - i) + "h ago";
+    });
+  }
+
+  function card(lease, now) {
+    const status = statusOf(lease, now);
+    const node = el("div", "dev-card status-" + status);
+    if (lease.reserved) node.appendChild(el("span", "card-reserved", "rsv"));
+
+    const top = el("div", "card-top");
+    top.appendChild(el("span", "card-host", lease.host || lease.ip));
+    top.appendChild(el("span", "card-time", relativeTime(lease.start, now)));
+    node.appendChild(top);
+
+    const meta = el("div", "card-meta");
+    if (lease.host) meta.appendChild(el("span", "card-ip", lease.ip));
+    if (lease.vendor) {
+      if (lease.host) meta.appendChild(el("span", "card-sep", "•"));
+      meta.appendChild(el("span", "card-vendor", lease.vendor));
+    }
+    if (meta.childNodes.length) node.appendChild(meta);
+
+    if (lease.mac) node.appendChild(el("div", "card-mac", lease.mac.toLowerCase()));
+
+    node.title = [lease.host, lease.ip, lease.vendor, lease.mac].filter(Boolean).join("\n");
+    return node;
+  }
+
+  function render(animate) {
+    if (!state) return;
+    const now = Date.now();
+    const size = state.size || sizeFromViewport();
+    const data = state.payload || { leases: [], total: 0 };
+    const leases = data.leases || [];
+
+    document.body.className = "size-" + size;
+
+    let newCount = 0, activeCount = 0, reservedCount = 0;
+    for (const lease of leases) {
+      if (lease.reserved) reservedCount++;
+      if (lease.start == null) continue;
+      const age = now - lease.start;
+      if (age < NEW_MS) newCount++;
+      if (age < ACTIVE_MS) activeCount++;
+    }
+
+    const total = data.total ?? leases.length;
+    $("total").textContent = total;
+    $("unit").textContent = total === 1 ? "device" : "devices";
+    $("new-count").textContent = newCount;
+    $("active-count").textContent = activeCount;
+    $("reserved-count").textContent = reservedCount;
+    $("updated").textContent = data.updatedAt
+      ? new Date(data.updatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+      : "";
+    $("footer-count").textContent = leases.length < total
+      ? leases.length + " of " + total
+      : total + (total === 1 ? " lease" : " leases");
+
+    renderSpark(leases, now);
+
+    const scrollTop = grid.scrollTop;
+    const fragment = document.createDocumentFragment();
+    if (leases.length === 0) {
+      fragment.appendChild(el("div", "empty", "No active leases"));
+    } else {
+      for (const lease of leases) fragment.appendChild(card(lease, now));
+    }
+    grid.replaceChildren(fragment);
+    grid.scrollTop = scrollTop;
+    if (!animate) for (const node of grid.children) node.style.animation = "none";
+    grid.classList.toggle("overflowing", grid.scrollHeight > grid.clientHeight + 1);
+  }
+
+  function receive(message) {
+    if (typeof message === "string") {
+      try { message = JSON.parse(message); } catch { return; }
+    }
+    if (!message || message.type !== "data") return;
+    state = message;
+    refreshBtn.classList.remove("busy");
+    refreshBtn.textContent = "Refresh";
+    render(true);
+  }
+
+  refreshBtn.addEventListener("click", () => {
+    refreshBtn.classList.add("busy");
+    refreshBtn.textContent = "Refreshing";
+    post({ type: "refresh" });
+    if (!bridge) setTimeout(() => receive({ type: "data", size: state && state.size, payload: demoData() }), 600);
+  });
+
+  // Keep relative times and statuses current between refreshes.
+  setInterval(() => render(false), 30 * 1000);
+
+  // Changing the widget size resizes this page instead of reloading it. Say "ready" again once
+  // the resize settles so the provider resumes pushing data with the new size.
+  let resizeTimer = 0;
+  addEventListener("resize", () => {
+    render(false);
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => post({ type: "ready" }), 400);
+  });
+
+  if (bridge) {
+    bridge.addEventListener("message", e => receive(e.data));
+    // The provider may still be starting up (or restarting), so keep asking until data arrives.
+    post({ type: "ready" });
+    const retry = setInterval(() => {
+      if (state) clearInterval(retry);
+      else post({ type: "ready" });
+    }, 3000);
+  } else {
+    // Preview only: give the page a board-like surface since it is transparent in the widget.
+    document.documentElement.classList.add("preview");
+    const size = new URLSearchParams(location.search).get("size");
+    receive({ type: "data", size: size || null, payload: demoData() });
+  }
+
+  // Demo data for previewing the page outside the Widget Board.
+  function demoData() {
+    const now = Date.now(), m = 60 * 1000, h = 60 * m, d = 24 * h;
+    const rows = [
+      ["alejandro-pc", "192.168.1.42", "Apple", "a4:83:e7:2f:01:cc", 2 * m],
+      ["living-room-tv", "192.168.1.103", "Samsung", "f4:7b:09:1a:88:d3", 4 * m],
+      ["iphone-alex", "192.168.1.55", "Apple", "82:c1:a0:7e:44:f9", 30 * m],
+      ["proxmox-node1", "192.168.1.10", "Supermicro", "ac:1f:6b:02:37:e8", 57 * m, true],
+      ["ring-doorbell", "192.168.1.88", "Amazon", "50:dc:e7:a3:00:b2", 2 * h],
+      ["ecobee-thermo", "192.168.1.91", "Ecobee", "44:61:32:ff:cc:90", 1 * d],
+      ["hp-laserjet", "192.168.1.200", "HP", "3c:d9:2b:55:11:a7", 2 * d],
+      ["unifi-ap-lr", "192.168.1.5", "Ubiquiti", "fc:ec:da:bb:19:44", 3 * d, true],
+      ["nest-hub", "192.168.1.77", "Google", "48:d6:d5:e0:33:c1", 2 * d],
+      ["roku-bedroom", "192.168.1.112", "Roku", "d8:31:34:aa:7c:ee", 3 * d],
+      [null, "192.168.1.150", "Espressif", "24:0a:c4:11:22:33", 40 * m],
+      ["wyze-bulb-2", "192.168.1.32", "Espressif", "2c:aa:8e:10:20:30", 5 * h],
+      ["mk35s", "192.168.1.94", "Espressif", "84:f3:eb:01:02:03", 9 * h],
+      ["echo-show-5", "192.168.1.165", "Amazon", "44:00:49:aa:bb:cc", 14 * h]
+    ];
+    return {
+      updatedAt: now,
+      total: rows.length,
+      leases: rows
+        .map(([host, ip, vendor, mac, age, reserved]) => ({ host, ip, vendor, mac, start: now - age, reserved: !!reserved }))
+        .sort((a, b) => b.start - a.start)
+    };
+  }
+})();
+</script>
+</body>
+</html>

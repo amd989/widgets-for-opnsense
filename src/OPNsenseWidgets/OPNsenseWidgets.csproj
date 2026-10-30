@@ -24,6 +24,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Widgets\**\Templates\*.json" />
     <EmbeddedResource Include="Templates\*.json" />
+    <EmbeddedResource Include="Widgets\**\Web\*" />
   </ItemGroup>
 
 </Project>

@@ -5,10 +5,11 @@ using Microsoft.Windows.Widgets.Providers;
 using OPNsenseWidgets.Api;
 using OPNsenseWidgets.Configuration;
 using OPNsenseWidgets.Widgets;
+using Windows.Storage.Streams;
 
 namespace OPNsenseWidgets.Provider;
 
-public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
+public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2, IWidgetResourceProvider, IWidgetProviderMessage
 {
     private readonly Dictionary<string, WidgetInfo> _runningWidgets = [];
     private readonly Dictionary<string, IWidgetDefinition> _definitions = [];
@@ -91,13 +92,7 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
         _logger.LogInformation("OnActionInvoked: verb={Verb} id={WidgetId}", actionInvokedArgs.Verb, actionInvokedArgs.WidgetContext.Id);
         try
         {
-            var widgetId = actionInvokedArgs.WidgetContext.Id;
-            WidgetInfo? info;
-            lock (_lock)
-            {
-                if (!_runningWidgets.TryGetValue(widgetId, out info))
-                    return;
-            }
+            var info = GetOrAddWidget(actionInvokedArgs.WidgetContext);
 
             switch (actionInvokedArgs.Verb)
             {
@@ -135,13 +130,7 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
         _logger.LogInformation("OnWidgetContextChanged: id={WidgetId} size={Size}", contextChangedArgs.WidgetContext.Id, contextChangedArgs.WidgetContext.Size);
         try
         {
-            var widgetId = contextChangedArgs.WidgetContext.Id;
-            WidgetInfo? info;
-            lock (_lock)
-            {
-                if (!_runningWidgets.TryGetValue(widgetId, out info))
-                    return;
-            }
+            var info = GetOrAddWidget(contextChangedArgs.WidgetContext);
 
             info.CurrentSize = contextChangedArgs.WidgetContext.Size.ToString().ToLowerInvariant();
             UpdateWidget(info);
@@ -157,13 +146,7 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
         _logger.LogInformation("Activate: id={WidgetId} size={Size}", widgetContext.Id, widgetContext.Size);
         try
         {
-            WidgetInfo? info;
-            lock (_lock)
-            {
-                if (!_runningWidgets.TryGetValue(widgetContext.Id, out info))
-                    return;
-            }
-
+            var info = GetOrAddWidget(widgetContext);
             info.IsActive = true;
             info.CurrentSize = widgetContext.Size.ToString().ToLowerInvariant();
             UpdateWidget(info);
@@ -189,13 +172,7 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
         _logger.LogInformation("OnCustomizationRequested: id={WidgetId}", customizationRequestedArgs.WidgetContext.Id);
         try
         {
-            var widgetId = customizationRequestedArgs.WidgetContext.Id;
-            WidgetInfo? info;
-            lock (_lock)
-            {
-                if (!_runningWidgets.TryGetValue(widgetId, out info))
-                    return;
-            }
+            var info = GetOrAddWidget(customizationRequestedArgs.WidgetContext);
 
             info.InCustomization = true;
             UpdateWidgetWithConfigTemplate(info);
@@ -203,6 +180,32 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
         catch (Exception ex)
         {
             _logger.LogError(ex, "OnCustomizationRequested failed");
+        }
+    }
+
+    /// <summary>
+    /// Returns the tracked widget, adopting it if this process has not seen it yet. After a provider
+    /// restart the board can call in before RecoverRunningWidgets finishes (or if it hangs), and
+    /// ignoring those calls left widgets without data.
+    /// </summary>
+    private WidgetInfo GetOrAddWidget(WidgetContext context)
+    {
+        lock (_lock)
+        {
+            if (_runningWidgets.TryGetValue(context.Id, out var existing))
+                return existing;
+
+            var info = new WidgetInfo
+            {
+                WidgetId = context.Id,
+                DefinitionId = context.DefinitionId,
+                IsActive = context.IsActive,
+                CurrentSize = context.Size.ToString().ToLowerInvariant()
+            };
+            _runningWidgets[context.Id] = info;
+            EmptyEvent.Reset();
+            _logger.LogInformation("GetOrAddWidget: adopted id={WidgetId} defId={DefinitionId}", context.Id, context.DefinitionId);
+            return info;
         }
     }
 
@@ -247,6 +250,7 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
 
             string template;
             string data;
+            IWebWidgetDefinition? web = null;
 
             if (info.InCustomization)
             {
@@ -270,6 +274,13 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
                 _logger.LogDebug("UpdateWidget: using data template for size={Size}", info.CurrentSize);
                 template = definition.GetTemplate(info.CurrentSize);
                 data = definition.BuildDataJson(info.CachedData, info.CurrentSize);
+
+                // Web-capable hosts render the page; others fall back to the card body.
+                if (definition is IWebWidgetDefinition webDefinition)
+                {
+                    web = webDefinition;
+                    template = WebContent.WithWebUrl(template, WebContent.UrlFor(webDefinition.WebPath));
+                }
             }
             else
             {
@@ -286,9 +297,20 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
                 CustomState = info.CustomState
             };
 
+            // A different template may reload the page, which then posts "ready" again.
+            // Reset before sending so a fast "ready" is not overwritten.
+            if (web is null || template != info.LastTemplate)
+                info.WebReady = false;
+            info.LastTemplate = template;
+
             _logger.LogDebug("UpdateWidget: calling WidgetManager.UpdateWidget");
             WidgetManager.GetDefault().UpdateWidget(updateOptions);
             _logger.LogDebug("UpdateWidget: WidgetManager.UpdateWidget succeeded");
+
+            // Same template and a live page: it did not reload, so it still needs the new data.
+            // (PushWebData is a no-op unless the page already said "ready".)
+            if (web is not null && info.CachedData is not null)
+                PushWebData(info, web);
         }
         catch (Exception ex)
         {
@@ -324,6 +346,8 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
             };
 
             WidgetManager.GetDefault().UpdateWidget(updateOptions);
+            info.LastTemplate = template;
+            info.WebReady = false;
             _logger.LogDebug("UpdateWidgetWithConfigTemplate: succeeded");
         }
         catch (Exception ex)
@@ -379,6 +403,8 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
             return;
         }
 
+        info.LastRefreshAttempt = DateTime.Now;
+        var wasError = info.LastError is not null;
         try
         {
             var data = await definition.FetchDataAsync(client);
@@ -393,7 +419,144 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2
             _logger.LogError(ex, "RefreshWidgetAsync failed");
         }
 
+        // A live web page only needs the data; re-sending the template could reload it.
+        if (definition is IWebWidgetDefinition web && info.WebReady && !wasError && info.LastError is null && !info.InCustomization)
+        {
+            PushWebData(info, web);
+            return;
+        }
+
         UpdateWidget(info);
+    }
+
+    /// <summary>
+    /// Sends the latest data to the widget's page. Only when the page said it is ready, and always
+    /// off the calling thread: calling SendMessageToContent from inside a board callback (Activate etc.)
+    /// while the page is still being created deadlocked the Widget service.
+    /// </summary>
+    private void PushWebData(WidgetInfo info, IWebWidgetDefinition web)
+    {
+        if (!info.WebReady)
+            return;
+
+        string message;
+        try
+        {
+            message = JsonSerializer.Serialize(new
+            {
+                type = "data",
+                size = info.CurrentSize,
+                payload = web.BuildWebData(info.CachedData)
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "PushWebData: serialize failed for {WidgetId}", info.WidgetId);
+            return;
+        }
+
+        SendToContent(info.WidgetId, message);
+    }
+
+    // Web content (Windows App SDK 1.6.3+). Every request is logged so the debug log shows
+    // whether the page itself, or only its subresources, reach the provider.
+    public void OnResourceRequested(WidgetResourceRequestedArgs args)
+    {
+        var uri = args.Request.Uri;
+        _logger.LogInformation("OnResourceRequested: id={WidgetId} method={Method} uri={Uri}",
+            args.WidgetContext.Id, args.Request.Method, uri);
+
+        if (!WebContent.TryGet(uri, out var content, out var contentType))
+        {
+            _logger.LogInformation("OnResourceRequested: no packaged file for {Uri}, letting the system fetch it", uri);
+            return;
+        }
+
+        // The host reads the stream from another process, so use a native WinRT stream
+        // (InMemoryRandomAccessStream) rather than a managed MemoryStream wrapper.
+        var deferral = args.GetDeferral();
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var stream = new InMemoryRandomAccessStream();
+                using (var writer = new DataWriter(stream.GetOutputStreamAt(0)))
+                {
+                    writer.WriteBytes(content);
+                    await writer.StoreAsync();
+                    await writer.FlushAsync();
+                    writer.DetachStream();
+                }
+                stream.Seek(0);
+
+                var response = new WidgetResourceResponse(RandomAccessStreamReference.CreateFromStream(stream), "OK", 200);
+                response.Headers.Add("Content-Type", contentType);
+                args.Response = response;
+                _logger.LogInformation("OnResourceRequested: served {Bytes} bytes as {ContentType}", content.Length, contentType);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "OnResourceRequested failed");
+            }
+            finally
+            {
+                deferral.Complete();
+            }
+        });
+    }
+
+    public void OnMessageReceived(WidgetMessageReceivedArgs args)
+    {
+        var widgetId = args.WidgetContext.Id;
+        _logger.LogInformation("OnMessageReceived: id={WidgetId} message={Message}", widgetId, args.Message);
+
+        var info = GetOrAddWidget(args.WidgetContext);
+
+        string? type = null;
+        try
+        {
+            using var doc = JsonDocument.Parse(args.Message);
+            if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("type", out var t))
+                type = t.GetString();
+        }
+        catch (JsonException)
+        {
+            // Not JSON; ignore.
+        }
+
+        if (!_definitions.TryGetValue(info.DefinitionId, out var definition) || definition is not IWebWidgetDefinition web)
+            return;
+
+        switch (type)
+        {
+            case "ready":
+                info.WebReady = true;
+                if (info.CachedData is not null)
+                    PushWebData(info, web);
+                else if (info.LastRefreshAttempt is null || DateTime.Now - info.LastRefreshAttempt.Value > TimeSpan.FromSeconds(5))
+                    _ = RefreshWidgetAsync(info); // the page retries "ready" every 3 s; don't stack fetches
+                break;
+            case "refresh":
+                _ = RefreshWidgetAsync(info);
+                break;
+        }
+    }
+
+    // Always async: never call back into the Widget service on the thread of one of its callbacks.
+    private void SendToContent(string widgetId, string message)
+    {
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                WidgetManager.GetDefault().SendMessageToContent(widgetId, message);
+                _logger.LogDebug("SendMessageToContent: id={WidgetId} bytes={Bytes}", widgetId, message.Length);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "SendMessageToContent failed for {WidgetId}", widgetId);
+            }
+        });
     }
 
     private async Task TestConnectionAsync(WidgetInfo info)

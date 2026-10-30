@@ -78,7 +78,8 @@
                               DisplayName="DHCP Leases"
                               Description="Shows active DHCP leases from your OPNsense router, sorted by most recently connected"
                               IsCustomizable="true"
-                              AllowMultiple="false">
+                              AllowMultiple="false"
+                              WebRequestFilter="https://opnsense-widget.test/*">
                     <Capabilities>
                       <Capability>
                         <Size Name="small" />

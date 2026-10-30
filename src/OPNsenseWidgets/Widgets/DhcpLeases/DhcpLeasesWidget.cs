@@ -6,10 +6,36 @@ using OPNsenseWidgets.Rendering;
 
 namespace OPNsenseWidgets.Widgets.DhcpLeases;
 
-public sealed class DhcpLeasesWidget : IWidgetDefinition
+public sealed class DhcpLeasesWidget : IWebWidgetDefinition
 {
     public string DefinitionId => "DhcpLeases_Widget";
     public string DisplayName => "DHCP Leases";
+    public string WebPath => "DhcpLeases/index.html";
+
+    /// <summary>
+    /// Raw lease data for the HTML page (Web/index.html). The page derives status, relative
+    /// times and the 24h histogram itself so they stay current between refreshes.
+    /// </summary>
+    public object BuildWebData(object? data)
+    {
+        var leases = data as List<DhcpLease> ?? [];
+        return new
+        {
+            updatedAt = DateTimeOffset.Now.ToUnixTimeMilliseconds(),
+            total = leases.Count,
+            leases = leases.Select(l => new
+            {
+                host = string.IsNullOrWhiteSpace(l.Hostname) ? null : l.Hostname,
+                ip = l.Address,
+                vendor = TruncateVendor(l.EffectiveManufacturer),
+                mac = l.EffectiveMac,
+                start = l.EffectiveLeaseStart == DateTime.MinValue
+                    ? (long?)null
+                    : new DateTimeOffset(l.EffectiveLeaseStart).ToUnixTimeMilliseconds(),
+                reserved = l.IsReserved == "1"
+            })
+        };
+    }
 
     private const int MaxPages = 5;
     private readonly List<(DateTime Time, int Count)> _history = [];

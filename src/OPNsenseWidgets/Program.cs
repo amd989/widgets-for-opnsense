@@ -94,10 +94,22 @@ internal class Program
             return;
         }
 
-        provider.RecoverRunningWidgets();
-
         var refreshService = serviceProvider.GetRequiredService<RefreshService>();
         refreshService.Start();
+
+        // GetWidgetInfos can hang while the board is calling into a freshly started provider,
+        // so never block startup on it. Widgets the board talks to are adopted on first contact anyway.
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                provider.RecoverRunningWidgets();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "RecoverRunningWidgets failed");
+            }
+        });
 
         logger.LogInformation("Waiting for EmptyEvent...");
         provider.EmptyEvent.Wait();
