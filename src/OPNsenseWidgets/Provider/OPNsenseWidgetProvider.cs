@@ -93,36 +93,103 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2, 
         try
         {
             var info = GetOrAddWidget(actionInvokedArgs.WidgetContext);
-
-            switch (actionInvokedArgs.Verb)
-            {
-                case "refresh":
-                    _ = RefreshWidgetAsync(info);
-                    break;
-                case "saveConfig":
-                    SaveConfiguration(actionInvokedArgs.Data);
-                    info.InCustomization = false;
-                    info.TestResult = null;
-                    _ = RefreshWidgetAsync(info);
-                    break;
-                case "cancelConfig":
-                    info.InCustomization = false;
-                    info.TestResult = null;
-                    UpdateWidget(info);
-                    break;
-                case "testConnection":
-                    SaveConfiguration(actionInvokedArgs.Data);
-                    _ = TestConnectionAsync(info);
-                    break;
-                case "importKeyFile":
-                    ImportKeyFile(info);
-                    break;
-            }
+            HandleAction(info, actionInvokedArgs.Verb, actionInvokedArgs.Data);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "OnActionInvoked failed");
         }
+    }
+
+    /// <summary>Card buttons (Action.Execute) and web page buttons ({type:"action"}) share these verbs.</summary>
+    private void HandleAction(WidgetInfo info, string verb, string data)
+    {
+        switch (verb)
+        {
+            case "refresh":
+                _ = RefreshWidgetAsync(info);
+                break;
+            case "openSettings":
+                // Settings inside the widget itself (status page button), not the board's dialog.
+                info.InCustomization = true;
+                info.CustomizingInDialog = false;
+                ClearTestResult(info);
+                UpdateWidget(info);
+                break;
+            case "saveConfig":
+                SaveConfiguration(data);
+                if (info.InCustomization && info.CustomizingInDialog)
+                {
+                    // The dialog stays open whatever we send, so confirm the save on the settings page.
+                    _ = SaveInDialogAsync(info);
+                    break;
+                }
+                EndCustomization(info);
+                _ = RefreshWidgetAsync(info);
+                break;
+            case "cancelConfig":
+                EndCustomization(info);
+                UpdateWidget(info);
+                break;
+            case "testConnection":
+                SaveConfiguration(data);
+                _ = TestConnectionAsync(info);
+                break;
+            case "importKeyFile":
+                ImportKeyFile(info);
+                break;
+            default:
+                _logger.LogWarning("HandleAction: unknown verb {Verb}", verb);
+                break;
+        }
+    }
+
+    private static void ClearTestResult(WidgetInfo info)
+    {
+        info.TestResult = null;
+        info.TestOk = null;
+    }
+
+    private static void EndCustomization(WidgetInfo info)
+    {
+        info.InCustomization = false;
+        info.CustomizingInDialog = false;
+        ClearTestResult(info);
+    }
+
+    /// <summary>Save from the Customize dialog: fetch with the new settings and report on the settings page.</summary>
+    private async Task SaveInDialogAsync(WidgetInfo info)
+    {
+        if (!_definitions.TryGetValue(info.DefinitionId, out var definition))
+            return;
+
+        using var client = _apiClientFactory.Create();
+        if (client is null)
+        {
+            info.TestResult = "Saved. Add the URL, key and secret to connect.";
+            info.TestOk = false;
+            UpdateWidget(info);
+            return;
+        }
+
+        info.LastRefreshAttempt = DateTime.Now;
+        try
+        {
+            info.CachedData = await definition.FetchDataAsync(client);
+            info.LastError = null;
+            info.LastRefresh = DateTime.Now;
+            info.TestResult = "Saved. Close this window to see the widget.";
+            info.TestOk = true;
+        }
+        catch (Exception ex)
+        {
+            info.LastError = ex.Message;
+            info.TestResult = $"Saved, but the connection failed: {ex.Message}";
+            info.TestOk = false;
+            _logger.LogError(ex, "SaveInDialogAsync: fetch failed");
+        }
+
+        UpdateWidget(info);
     }
 
     public void OnWidgetContextChanged(WidgetContextChangedArgs contextChangedArgs)
@@ -162,8 +229,19 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2, 
         _logger.LogInformation("Deactivate: id={WidgetId}", widgetId);
         lock (_lock)
         {
-            if (_runningWidgets.TryGetValue(widgetId, out var info))
-                info.IsActive = false;
+            if (!_runningWidgets.TryGetValue(widgetId, out var info))
+                return;
+            info.IsActive = false;
+
+            // The board's Customize dialog closing (X, Save then X, or the board closing) shows up as a
+            // Deactivate. Leave settings so the widget comes back with its data on the next Activate.
+            // The grace period skips a Deactivate the board may send while the dialog is still opening.
+            if (info.InCustomization && info.CustomizingInDialog &&
+                DateTime.Now - info.CustomizationStartedAt > TimeSpan.FromSeconds(2))
+            {
+                _logger.LogInformation("Deactivate: customize dialog closed for {WidgetId}", widgetId);
+                EndCustomization(info);
+            }
         }
     }
 
@@ -174,8 +252,12 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2, 
         {
             var info = GetOrAddWidget(customizationRequestedArgs.WidgetContext);
 
+            // The board shows customization in its own dialog (resized to large), not in the widget.
             info.InCustomization = true;
-            UpdateWidgetWithConfigTemplate(info);
+            info.CustomizingInDialog = true;
+            info.CustomizationStartedAt = DateTime.Now;
+            ClearTestResult(info);
+            UpdateWidget(info);
         }
         catch (Exception ex)
         {
@@ -245,50 +327,70 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2, 
         _logger.LogDebug("UpdateWidget: id={WidgetId} defId={DefinitionId} size={Size}", info.WidgetId, info.DefinitionId, info.CurrentSize);
         try
         {
+            if (!_definitions.TryGetValue(info.DefinitionId, out var definition))
+            {
+                _logger.LogWarning("UpdateWidget: no definition found for {DefinitionId}", info.DefinitionId);
+                return;
+            }
+
             var settings = _settingsManager.Load();
             var credentials = _credentialStore.LoadCredentials();
 
             string template;
             string data;
-            IWebWidgetDefinition? web = null;
+            string view;
+            string? webPath;
 
             if (info.InCustomization)
             {
-                UpdateWidgetWithConfigTemplate(info);
-                return;
+                _logger.LogDebug("UpdateWidget: using ConfigurationTemplate");
+                template = TemplateHelper.LoadSharedTemplate("ConfigurationTemplate.json");
+                data = JsonSerializer.Serialize(new
+                {
+                    hostUrl = settings.HostUrl,
+                    apiKey = credentials?.ApiKey ?? "",
+                    apiSecret = credentials?.ApiSecret ?? "",
+                    allowSelfSigned = settings.AllowSelfSignedCertificates,
+                    refreshInterval = settings.RefreshIntervalSeconds,
+                    testResult = info.TestResult ?? "",
+                    hasTestResult = !string.IsNullOrEmpty(info.TestResult)
+                });
+                view = "settings";
+                webPath = WebContent.SettingsPath;
             }
             else if (!settings.IsConfigured || credentials is null)
             {
                 _logger.LogDebug("UpdateWidget: using UnconfiguredTemplate");
                 template = TemplateHelper.LoadSharedTemplate("UnconfiguredTemplate.json");
                 data = "{}";
+                view = "status";
+                webPath = WebContent.StatusPath;
             }
             else if (info.LastError is not null)
             {
                 _logger.LogDebug("UpdateWidget: using ErrorTemplate, error={Error}", info.LastError);
                 template = TemplateHelper.LoadSharedTemplate("ErrorTemplate.json");
                 data = JsonSerializer.Serialize(new { errorMessage = info.LastError });
+                view = "status";
+                webPath = WebContent.StatusPath;
             }
-            else if (_definitions.TryGetValue(info.DefinitionId, out var definition))
+            else
             {
                 _logger.LogDebug("UpdateWidget: using data template for size={Size}", info.CurrentSize);
                 template = definition.GetTemplate(info.CurrentSize);
                 data = definition.BuildDataJson(info.CachedData, info.CurrentSize);
-
-                // Web-capable hosts render the page; others fall back to the card body.
-                if (definition is IWebWidgetDefinition webDefinition)
-                {
-                    web = webDefinition;
-                    template = WebContent.WithWebUrl(template, WebContent.UrlFor(webDefinition.WebPath));
-                }
-            }
-            else
-            {
-                _logger.LogWarning("UpdateWidget: no definition found for {DefinitionId}", info.DefinitionId);
-                return;
+                view = "data";
+                webPath = (definition as IWebWidgetDefinition)?.WebPath;
             }
 
-            _logger.LogDebug("UpdateWidget: template length={TemplateLength} data length={DataLength}", template.Length, data.Length);
+            // A widget with web content gets a page for every state, not only its data view: the board
+            // fails to load plain cards (settings, errors) for these widgets. The card body stays as the
+            // fallback for hosts without web content.
+            var isWeb = definition is IWebWidgetDefinition;
+            if (isWeb && webPath is not null)
+                template = WebContent.WithWebUrl(template, WebContent.UrlFor(webPath));
+
+            _logger.LogDebug("UpdateWidget: view={View} template length={TemplateLength} data length={DataLength}", view, template.Length, data.Length);
 
             var updateOptions = new WidgetUpdateRequestOptions(info.WidgetId)
             {
@@ -299,9 +401,10 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2, 
 
             // A different template may reload the page, which then posts "ready" again.
             // Reset before sending so a fast "ready" is not overwritten.
-            if (web is null || template != info.LastTemplate)
+            if (!isWeb || template != info.LastTemplate)
                 info.WebReady = false;
             info.LastTemplate = template;
+            info.WebView = view;
 
             _logger.LogDebug("UpdateWidget: calling WidgetManager.UpdateWidget");
             WidgetManager.GetDefault().UpdateWidget(updateOptions);
@@ -309,50 +412,12 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2, 
 
             // Same template and a live page: it did not reload, so it still needs the new data.
             // (PushWebData is a no-op unless the page already said "ready".)
-            if (web is not null && info.CachedData is not null)
-                PushWebData(info, web);
+            if (isWeb)
+                PushWebData(info);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "UpdateWidget failed");
-        }
-    }
-
-    private void UpdateWidgetWithConfigTemplate(WidgetInfo info)
-    {
-        _logger.LogDebug("UpdateWidgetWithConfigTemplate: id={WidgetId}", info.WidgetId);
-        try
-        {
-            var settings = _settingsManager.Load();
-            var credentials = _credentialStore.LoadCredentials();
-
-            var template = TemplateHelper.LoadSharedTemplate("ConfigurationTemplate.json");
-            var data = JsonSerializer.Serialize(new
-            {
-                hostUrl = settings.HostUrl,
-                apiKey = credentials?.ApiKey ?? "",
-                apiSecret = credentials?.ApiSecret ?? "",
-                allowSelfSigned = settings.AllowSelfSignedCertificates,
-                refreshInterval = settings.RefreshIntervalSeconds,
-                testResult = info.TestResult ?? "",
-                hasTestResult = !string.IsNullOrEmpty(info.TestResult)
-            });
-
-            var updateOptions = new WidgetUpdateRequestOptions(info.WidgetId)
-            {
-                Template = template,
-                Data = data,
-                CustomState = info.CustomState
-            };
-
-            WidgetManager.GetDefault().UpdateWidget(updateOptions);
-            info.LastTemplate = template;
-            info.WebReady = false;
-            _logger.LogDebug("UpdateWidgetWithConfigTemplate: succeeded");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "UpdateWidgetWithConfigTemplate failed");
         }
     }
 
@@ -370,6 +435,10 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2, 
             var refreshInterval = root.TryGetProperty("refreshInterval", out var r) ? int.TryParse(r.GetString(), out var ri) ? ri : 30 : 30;
 
             refreshInterval = Math.Clamp(refreshInterval, 10, 300);
+
+            // The settings page never receives the saved secret, so an empty field means "keep it".
+            if (string.IsNullOrWhiteSpace(apiSecret))
+                apiSecret = _credentialStore.LoadCredentials()?.ApiSecret ?? "";
 
             if (!string.IsNullOrWhiteSpace(apiKey) && !string.IsNullOrWhiteSpace(apiSecret))
                 _credentialStore.SaveCredentials(apiKey, apiSecret);
@@ -420,9 +489,10 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2, 
         }
 
         // A live web page only needs the data; re-sending the template could reload it.
-        if (definition is IWebWidgetDefinition web && info.WebReady && !wasError && info.LastError is null && !info.InCustomization)
+        if (definition is IWebWidgetDefinition && info.WebReady && info.WebView == "data" &&
+            !wasError && info.LastError is null && !info.InCustomization)
         {
-            PushWebData(info, web);
+            PushWebData(info);
             return;
         }
 
@@ -430,23 +500,34 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2, 
     }
 
     /// <summary>
-    /// Sends the latest data to the widget's page. Only when the page said it is ready, and always
-    /// off the calling thread: calling SendMessageToContent from inside a board callback (Activate etc.)
-    /// while the page is still being created deadlocked the Widget service.
+    /// Sends the current view's payload to the widget's page. Only when the page said it is ready, and
+    /// always off the calling thread: calling SendMessageToContent from inside a board callback (Activate
+    /// etc.) while the page is still being created deadlocked the Widget service.
     /// </summary>
-    private void PushWebData(WidgetInfo info, IWebWidgetDefinition web)
+    private void PushWebData(WidgetInfo info)
     {
-        if (!info.WebReady)
+        if (!info.WebReady || !_definitions.TryGetValue(info.DefinitionId, out var definition) ||
+            definition is not IWebWidgetDefinition web)
             return;
 
         string message;
         try
         {
+            object? payload = info.WebView switch
+            {
+                "settings" => BuildSettingsPayload(info),
+                "status" => BuildStatusPayload(info),
+                _ => info.CachedData is null ? null : web.BuildWebData(info.CachedData)
+            };
+            if (payload is null)
+                return;
+
             message = JsonSerializer.Serialize(new
             {
                 type = "data",
+                view = info.WebView,
                 size = info.CurrentSize,
-                payload = web.BuildWebData(info.CachedData)
+                payload
             });
         }
         catch (Exception ex)
@@ -456,6 +537,33 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2, 
         }
 
         SendToContent(info.WidgetId, message);
+    }
+
+    /// <summary>Saved settings for settings.html. The secret itself never goes to the page.</summary>
+    private object BuildSettingsPayload(WidgetInfo info)
+    {
+        var settings = _settingsManager.Load();
+        var credentials = _credentialStore.LoadCredentials();
+        return new
+        {
+            hostUrl = settings.HostUrl,
+            apiKey = credentials?.ApiKey ?? "",
+            hasSecret = !string.IsNullOrEmpty(credentials?.ApiSecret),
+            allowSelfSigned = settings.AllowSelfSignedCertificates,
+            refreshInterval = settings.RefreshIntervalSeconds,
+            testResult = info.TestResult,
+            testOk = info.TestOk,
+            inDialog = info.CustomizingInDialog
+        };
+    }
+
+    /// <summary>Same order as UpdateWidget: missing settings win over a stale error.</summary>
+    private object BuildStatusPayload(WidgetInfo info)
+    {
+        var configured = _settingsManager.Load().IsConfigured && _credentialStore.LoadCredentials() is not null;
+        return !configured || info.LastError is null
+            ? new { kind = "unconfigured", message = (string?)null }
+            : new { kind = "error", message = (string?)info.LastError };
     }
 
     // Web content (Windows App SDK 1.6.3+). Every request is logged so the debug log shows
@@ -512,32 +620,45 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2, 
 
         var info = GetOrAddWidget(args.WidgetContext);
 
-        string? type = null;
+        string? type = null, verb = null, data = null;
         try
         {
             using var doc = JsonDocument.Parse(args.Message);
-            if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("type", out var t))
-                type = t.GetString();
+            var root = doc.RootElement;
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                if (root.TryGetProperty("type", out var t)) type = t.GetString();
+                if (root.TryGetProperty("verb", out var v)) verb = v.GetString();
+                if (root.TryGetProperty("data", out var d) && d.ValueKind == JsonValueKind.Object) data = d.GetRawText();
+            }
         }
         catch (JsonException)
         {
             // Not JSON; ignore.
         }
 
-        if (!_definitions.TryGetValue(info.DefinitionId, out var definition) || definition is not IWebWidgetDefinition web)
+        if (!_definitions.TryGetValue(info.DefinitionId, out var definition) || definition is not IWebWidgetDefinition)
             return;
 
         switch (type)
         {
             case "ready":
                 info.WebReady = true;
-                if (info.CachedData is not null)
-                    PushWebData(info, web);
+                if (info.WebView != "data" || info.CachedData is not null)
+                    PushWebData(info);
                 else if (info.LastRefreshAttempt is null || DateTime.Now - info.LastRefreshAttempt.Value > TimeSpan.FromSeconds(5))
                     _ = RefreshWidgetAsync(info); // the page retries "ready" every 3 s; don't stack fetches
                 break;
             case "refresh":
                 _ = RefreshWidgetAsync(info);
+                break;
+            case "action" when !string.IsNullOrEmpty(verb):
+                // Off the callback thread, like SendToContent: actions update the widget and may send to the page.
+                _ = Task.Run(() =>
+                {
+                    try { HandleAction(info, verb, data ?? "{}"); }
+                    catch (Exception ex) { _logger.LogError(ex, "HandleAction failed for {Verb}", verb); }
+                });
                 break;
         }
     }
@@ -567,7 +688,8 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2, 
         if (client is null)
         {
             info.TestResult = "Enter URL and credentials first.";
-            UpdateWidgetWithConfigTemplate(info);
+            info.TestOk = false;
+            UpdateWidget(info);
             return;
         }
 
@@ -576,6 +698,7 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2, 
             await client.GetLeasesAsync(page: 1, rowCount: 1);
             info.LastError = null;
             info.TestResult = "Connection successful!";
+            info.TestOk = true;
 
             if (_definitions.TryGetValue(info.DefinitionId, out var definition))
             {
@@ -589,10 +712,11 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2, 
         catch (Exception ex)
         {
             info.TestResult = $"Failed: {ex.Message}";
+            info.TestOk = false;
             _logger.LogError(ex, "TestConnectionAsync failed");
         }
 
-        UpdateWidgetWithConfigTemplate(info);
+        UpdateWidget(info);
     }
 
     [DllImport("shell32.dll")]
@@ -620,7 +744,8 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2, 
             if (keyFiles.Length == 0)
             {
                 info.TestResult = "No *_apikey.txt found in Downloads.";
-                UpdateWidgetWithConfigTemplate(info);
+                info.TestOk = false;
+                UpdateWidget(info);
                 return;
             }
 
@@ -640,20 +765,23 @@ public sealed class OPNsenseWidgetProvider : IWidgetProvider, IWidgetProvider2, 
             if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(apiSecret))
             {
                 info.TestResult = "Key file found but missing key or secret.";
-                UpdateWidgetWithConfigTemplate(info);
+                info.TestOk = false;
+                UpdateWidget(info);
                 return;
             }
 
             _credentialStore.SaveCredentials(apiKey, apiSecret);
             info.TestResult = $"Imported from {Path.GetFileName(newest)}";
+            info.TestOk = true;
             _logger.LogInformation("ImportKeyFile: imported from {FileName}", Path.GetFileName(newest));
         }
         catch (Exception ex)
         {
             info.TestResult = $"Import failed: {ex.Message}";
+            info.TestOk = false;
             _logger.LogError(ex, "ImportKeyFile failed");
         }
 
-        UpdateWidgetWithConfigTemplate(info);
+        UpdateWidget(info);
     }
 }

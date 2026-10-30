@@ -3,7 +3,9 @@
 // Protocol with the provider (OPNsenseWidgetProvider):
 //   page -> provider: {type:"ready", w, h, dpr} on load, while waiting for data, and after resizes
 //                     {type:"refresh"} to fetch now
-//   provider -> page: {type:"data", size:"small|medium|large", payload:{...}}
+//                     {type:"action", verb, data} for the settings and status pages (same verbs as the cards)
+//   provider -> page: {type:"data", view, size:"small|medium|large", payload:{...}}
+//                     view is "data" (widget pages), "settings" or "status"; a page ignores other views.
 //
 // Opened in a normal browser (no WebView2 bridge) a page runs on demo data instead;
 // add ?size=small|medium|large, otherwise the size is guessed from the window.
@@ -17,6 +19,7 @@
   let state = null;      // last data message
   let renderFn = null;
   let demoFn = null;
+  let pageView = "data";
 
   function post(message) {
     if (bridge) bridge.postMessage(JSON.stringify(message));
@@ -47,22 +50,24 @@
     if (typeof message === "string") {
       try { message = JSON.parse(message); } catch { return; }
     }
-    if (!message || message.type !== "data") return;
+    if (!message || message.type !== "data" || (message.view || "data") !== pageView) return;
     state = message;
     draw(true);
   }
 
   function deliverDemo() {
-    if (demoFn) receive({ type: "data", size: previewSize, payload: demoFn() });
+    if (demoFn) receive({ type: "data", view: pageView, size: previewSize, payload: demoFn() });
   }
 
   /**
    * render(payload, size, fresh): fresh is true for new data, false for re-draws (resize, timers).
    * demo(): payload for browser preview. demoIntervalMs: re-generate demo data periodically.
+   * view: which provider messages this page takes ("data", "settings" or "status").
    */
-  function start({ render, demo, demoIntervalMs }) {
+  function start({ render, demo, demoIntervalMs, view }) {
     renderFn = render;
     demoFn = demo;
+    pageView = view || "data";
 
     // A size change resizes this page instead of reloading it: re-draw now, then say "ready"
     // again once it settles so the provider resumes pushing data with the new size.
@@ -91,6 +96,11 @@
   function refresh() {
     post({ type: "refresh" });
     if (preview) setTimeout(deliverDemo, 600);
+  }
+
+  /** Runs a provider verb (saveConfig, testConnection, refresh, ...). data values are strings, like card inputs. */
+  function action(verb, data) {
+    post({ type: "action", verb, data: data || {} });
   }
 
   // ─── DOM helpers ───
@@ -193,11 +203,11 @@
   }
 
   window.Widget = {
-    start, post, refresh, el, svgEl, fmt, niceCeil, smoothPath,
+    start, post, refresh, action, el, svgEl, fmt, niceCeil, smoothPath,
     rerender: () => draw(false),
     get size() { return currentSize(); },
     preview,
     // Browser preview only: feed a payload by hand, e.g. Widget.inject({...}) from the console.
-    inject: payload => preview && receive({ type: "data", size: previewSize, payload })
+    inject: payload => preview && receive({ type: "data", view: pageView, size: previewSize, payload })
   };
 })();

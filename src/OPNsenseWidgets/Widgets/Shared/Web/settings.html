@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OPNsense Settings</title>
+<link rel="stylesheet" href="widget.css">
+<!--
+  Connection settings, shown while the widget is being customized. Replaces the Adaptive Card form,
+  which the board fails to load for widgets that use web content. Buttons send the same verbs the card
+  used (saveConfig, testConnection, importKeyFile, cancelConfig); values are strings like card inputs.
+  The secret is never sent to the page: an empty secret field keeps the saved one.
+  In the board's Customize dialog (payload.inDialog) Save reports the result here instead of
+  leaving, since only the dialog's own close button can close it.
+-->
+<style>
+  .app { gap: 8px; }
+  .heading { font-size: 13px; font-weight: 600; }
+  .heading small { display: block; margin-top: 2px; font-size: 10px; font-weight: 400; color: var(--text-2); }
+
+  .fields { display: flex; flex-direction: column; gap: 6px; }
+  .field { display: grid; grid-template-columns: 46px 1fr; align-items: center; gap: 8px; }
+  .field label { font-size: 11px; color: var(--text-2); }
+  input[type=text], input[type=password], input[type=number] {
+    width: 100%; height: 26px; padding: 0 8px;
+    font: 12px var(--mono); color: var(--text-1);
+    background: var(--surface-card); border: 1px solid var(--border-card); border-radius: 5px;
+    outline: none; user-select: text;
+  }
+  input:focus { border-color: var(--blue); background: var(--surface-card-hover); }
+  input::placeholder { color: var(--text-3); }
+
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .toggle { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--text-2); cursor: pointer; }
+  .toggle input { appearance: none; width: 28px; height: 16px; border-radius: 8px; background: var(--dot); position: relative; cursor: pointer; transition: background 0.15s; flex-shrink: 0; }
+  .toggle input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 10px; height: 10px; border-radius: 50%; background: #fff; transition: transform 0.15s; }
+  .toggle input:checked { background: var(--blue); }
+  .toggle input:checked::after { transform: translateX(12px); }
+  .interval { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-2); }
+  .interval input { width: 54px; text-align: right; }
+
+  .result { font-size: 11px; min-height: 15px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .result.ok { color: var(--green); }
+  .result.fail { color: #f87171; }
+  @media (prefers-color-scheme: light) { .result.fail { color: #d03b3b; } }
+
+  .actions { display: flex; gap: 6px; margin-top: auto; }
+  .btn {
+    height: 28px; padding: 0 12px; border-radius: 5px; font-size: 12px;
+    background: var(--surface-card-hover); border: 1px solid var(--border-card);
+    transition: background 0.15s, opacity 0.15s;
+  }
+  .btn:hover { background: var(--blue-soft); }
+  .btn.primary { background: var(--blue); border-color: transparent; color: #fff; font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.ghost { background: none; border-color: transparent; color: var(--text-2); margin-left: auto; }
+  .btn:disabled { opacity: 0.5; pointer-events: none; }
+  .btn[hidden] { display: none; }
+  .btn.busy::after { content: ""; display: inline-block; width: 9px; height: 9px; margin-left: 6px; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: -1px; }
+
+  /* Small is too short for the form. */
+  .form { display: contents; }
+  .too-small { display: none; }
+  .size-small .form { display: none; }
+  .size-small .too-small { display: flex; flex-direction: column; gap: 8px; font-size: 11px; color: var(--text-2); }
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="form">
+      <div class="heading">Connection<small>OPNsense API key with read access</small></div>
+      <div class="fields">
+        <div class="field"><label for="hostUrl">URL</label><input id="hostUrl" type="text" placeholder="https://192.168.1.1" spellcheck="false" autocomplete="off"></div>
+        <div class="field"><label for="apiKey">Key</label><input id="apiKey" type="text" placeholder="API key" spellcheck="false" autocomplete="off"></div>
+        <div class="field"><label for="apiSecret">Secret</label><input id="apiSecret" type="password" placeholder="API secret" autocomplete="off"></div>
+      </div>
+      <div class="row">
+        <label class="toggle"><input id="allowSelfSigned" type="checkbox">Self-signed cert</label>
+        <label class="interval">Refresh <input id="refreshInterval" type="number" min="10" max="300" step="5"> s</label>
+      </div>
+      <div class="result" id="result"></div>
+      <div class="actions">
+        <button class="btn primary" id="save">Save</button>
+        <button class="btn" id="test">Test</button>
+        <button class="btn" id="import" title="Reads the newest *_apikey.txt from Downloads">Import key</button>
+        <button class="btn ghost" id="cancel">Cancel</button>
+      </div>
+    </div>
+    <div class="too-small">
+      <div class="heading">Settings</div>
+      <span>Resize the widget to medium or large to edit the connection.</span>
+      <div class="actions"><button class="btn" id="cancelSmall">Cancel</button></div>
+    </div>
+  </div>
+
+  <script src="widget.js"></script>
+  <script>
+    "use strict";
+    const $ = id => document.getElementById(id);
+    const inputs = ["hostUrl", "apiKey", "apiSecret", "refreshInterval"].map($);
+    let pending = null; // button waiting for a provider answer
+
+    function formData() {
+      return {
+        hostUrl: $("hostUrl").value.trim(),
+        apiKey: $("apiKey").value.trim(),
+        apiSecret: $("apiSecret").value.trim(),
+        allowSelfSigned: $("allowSelfSigned").checked ? "true" : "false",
+        refreshInterval: String($("refreshInterval").value || 30)
+      };
+    }
+
+    function busy(button) {
+      pending = button;
+      for (const b of document.querySelectorAll(".actions .btn")) b.disabled = b !== button;
+      if (button) button.classList.add("busy");
+    }
+
+    function idle() {
+      if (pending) pending.classList.remove("busy");
+      pending = null;
+      for (const b of document.querySelectorAll(".actions .btn")) b.disabled = false;
+    }
+
+    function render(p, size, fresh) {
+      if (!fresh) return;
+      idle();
+      // Keep what the user is typing; everything else shows the saved values.
+      const focused = document.activeElement;
+      if (focused !== $("hostUrl")) $("hostUrl").value = p.hostUrl || "";
+      if (focused !== $("apiKey")) $("apiKey").value = p.apiKey || "";
+      if (focused !== $("apiSecret")) $("apiSecret").value = "";
+      $("apiSecret").placeholder = p.hasSecret ? "Saved (leave empty to keep)" : "API secret";
+      $("allowSelfSigned").checked = p.allowSelfSigned !== false;
+      if (focused !== $("refreshInterval")) $("refreshInterval").value = p.refreshInterval || 30;
+
+      // In the board's Customize dialog only its own close button can end it, so Cancel would just
+      // swap the dialog to the widget view. Hide it there.
+      $("cancel").hidden = !!p.inDialog;
+
+      const result = $("result");
+      result.textContent = p.testResult || "";
+      result.title = p.testResult || "";
+      result.className = "result" + (p.testOk === true ? " ok" : p.testOk === false ? " fail" : "");
+    }
+
+    $("save").onclick = () => { busy($("save")); Widget.action("saveConfig", formData()); };
+    $("test").onclick = () => { busy($("test")); $("result").textContent = "Testing…"; $("result").className = "result"; Widget.action("testConnection", formData()); };
+    $("import").onclick = () => { busy($("import")); Widget.action("importKeyFile"); };
+    $("cancel").onclick = $("cancelSmall").onclick = () => Widget.action("cancelConfig");
+    for (const input of inputs) input.addEventListener("keydown", e => { if (e.key === "Enter") $("save").click(); });
+
+    Widget.start({
+      view: "settings",
+      render,
+      demo: () => ({
+        hostUrl: "https://192.168.1.1", apiKey: "demo-api-key", hasSecret: true,
+        allowSelfSigned: true, refreshInterval: 30, testResult: "Connected, 64 leases", testOk: true
+      })
+    });
+  </script>
+</body>
+</html>

@@ -15,6 +15,11 @@ public static class WebContent
 {
     public const string Origin = "https://opnsense-widget.test";
 
+    /// <summary>Connection settings, shown while a widget is customized.</summary>
+    public const string SettingsPath = "Shared/Web/settings.html";
+    /// <summary>"Not set up" and "connection error" states.</summary>
+    public const string StatusPath = "Shared/Web/status.html";
+
     private static readonly Assembly Assembly = typeof(WebContent).Assembly;
 
     // Lower-cased "folder/web/file" -> manifest resource name.

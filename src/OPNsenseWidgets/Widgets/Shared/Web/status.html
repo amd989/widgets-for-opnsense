@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OPNsense Status</title>
+<link rel="stylesheet" href="widget.css">
+<!--
+  "Not set up yet" and "connection error" states for every widget. Replaces the Adaptive Card versions,
+  which the board fails to load for widgets that use web content.
+  Payload: {kind: "unconfigured" | "error", message}
+-->
+<style>
+  .app { justify-content: center; gap: 10px; }
+  .size-small .app { gap: 6px; }
+  .icon { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; }
+  .icon svg { width: 16px; height: 16px; }
+  .icon.setup { background: var(--blue-soft); color: var(--blue); }
+  .icon.error { background: rgba(248, 113, 113, 0.12); color: #f87171; }
+  @media (prefers-color-scheme: light) { .icon.error { color: #d03b3b; } }
+  .size-small .icon { display: none; }
+
+  .title { font-size: 14px; font-weight: 600; }
+  .text { font-size: 11px; line-height: 1.45; color: var(--text-2); }
+  .message {
+    font-size: 10px; font-family: var(--mono); color: var(--text-mono); line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    user-select: text; word-break: break-word;
+  }
+  .size-small .text { display: none; }
+  .size-small .message { -webkit-line-clamp: 2; }
+
+  .actions { display: flex; gap: 6px; }
+  .btn {
+    height: 28px; padding: 0 12px; border-radius: 5px; font-size: 12px;
+    background: var(--surface-card-hover); border: 1px solid var(--border-card);
+    transition: background 0.15s;
+  }
+  .btn:hover { background: var(--blue-soft); }
+  .btn.primary { background: var(--blue); border-color: transparent; color: #fff; font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.busy { opacity: 0.6; pointer-events: none; }
+  .size-small .btn { height: 24px; font-size: 11px; }
+</style>
+</head>
+<body>
+  <div class="app" id="app"></div>
+
+  <script src="widget.js"></script>
+  <script>
+    "use strict";
+    const { el } = Widget;
+    const ICONS = {
+      setup: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6.5 9.5 9.5 6.5M7 4.5l1-1a2.8 2.8 0 0 1 4 4l-1 1M9 11.5l-1 1a2.8 2.8 0 0 1-4-4l1-1"/></svg>',
+      error: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 4.5v4.2M8 11.3v.1"/><circle cx="8" cy="8" r="6.2"/></svg>'
+    };
+
+    function button(text, verb, primary) {
+      const b = el("button", "btn" + (primary ? " primary" : ""), text);
+      b.onclick = () => { b.classList.add("busy"); Widget.action(verb); };
+      return b;
+    }
+
+    function render(p, size, fresh) {
+      if (!fresh) return;
+      const app = document.getElementById("app");
+      app.replaceChildren();
+      const error = p.kind === "error";
+
+      const icon = el("div", "icon " + (error ? "error" : "setup"));
+      icon.innerHTML = error ? ICONS.error : ICONS.setup;
+      app.append(icon);
+
+      if (error) {
+        app.append(el("div", "title", "Can't reach OPNsense"));
+        const message = el("div", "message", p.message || "Unknown error");
+        message.title = p.message || "";
+        app.append(message);
+      } else {
+        app.append(el("div", "title", "Connect your router"));
+        app.append(el("div", "text", "Add your OPNsense URL and an API key to start."));
+      }
+
+      const actions = el("div", "actions");
+      if (error) actions.append(button("Retry", "refresh", true), button("Settings", "openSettings"));
+      else actions.append(button("Set up", "openSettings", true));
+      app.append(actions);
+    }
+
+    const demoKind = new URLSearchParams(location.search).get("kind") || "error";
+    Widget.start({
+      view: "status",
+      render,
+      demo: () => demoKind === "error"
+        ? { kind: "error", message: "The SSL connection could not be established, see inner exception." }
+        : { kind: "unconfigured" }
+    });
+  </script>
+</body>
+</html>
