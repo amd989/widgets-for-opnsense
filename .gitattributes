@@ -1,0 +1,5 @@
+# Scripts and QML run on Linux: keep LF even on Windows checkouts.
+*.sh text eol=lf
+*.qml text eol=lf
+*.service text eol=lf
+linux/** text eol=lf

@@ -484,3 +484,5 @@ $RECYCLE.BIN/
 .claude
 .vscode
 .playwright
+# Linux daemon publish output (linux/install.sh input)
+linux/dist/

@@ -1,0 +1,14 @@
+[Unit]
+Description=OPNsense widgets service (feeds the OPNsense Plasma widgets)
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=%h/.local/lib/opnsense-widgets/opnsense-widgetsd
+Restart=on-failure
+RestartSec=5
+# Change the port here and in each widget's settings if 47820 is taken.
+#Environment=OPNSENSE_WIDGETS_PORT=47820
+
+[Install]
+WantedBy=graphical-session.target

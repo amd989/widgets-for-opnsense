@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- OS-neutral widget logic shared by the Windows provider and the Linux daemon. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Keeps embedded resource names as OPNsenseWidgets.Widgets.<Name>.Web.<file> (see WebAssets). -->
+    <RootNamespace>OPNsenseWidgets</RootNamespace>
+    <!-- The MSIX build and the Linux publish both pass a runtime identifier down to this project. -->
+    <RuntimeIdentifiers>win-x64;win-arm64;linux-x64;linux-arm64</RuntimeIdentifiers>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp" Version="3.119.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Widgets\**\Templates\*.json" />
+    <EmbeddedResource Include="Templates\*.json" />
+    <EmbeddedResource Include="Widgets\**\Web\*" />
+  </ItemGroup>
+
+</Project>

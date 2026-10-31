@@ -2,7 +2,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using OPNsenseWidgets.Api;
 using OPNsenseWidgets.Api.Models;
-using OPNsenseWidgets.Provider;
+using OPNsenseWidgets.Hosting;
 using OPNsenseWidgets.Rendering;
 
 namespace OPNsenseWidgets.Widgets.Firewall;

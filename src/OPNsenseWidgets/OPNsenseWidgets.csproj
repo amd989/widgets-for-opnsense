@@ -15,16 +15,13 @@
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260317003" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.1721" />
     <PackageReference Include="AdysTech.CredentialManager" Version="3.*" />
-    <PackageReference Include="SkiaSharp" Version="3.119.2" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.*" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="8.*" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.*" />
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Widgets\**\Templates\*.json" />
-    <EmbeddedResource Include="Templates\*.json" />
-    <EmbeddedResource Include="Widgets\**\Web\*" />
+    <ProjectReference Include="..\OPNsenseWidgets.Core\OPNsenseWidgets.Core.csproj" />
   </ItemGroup>
 
 </Project>

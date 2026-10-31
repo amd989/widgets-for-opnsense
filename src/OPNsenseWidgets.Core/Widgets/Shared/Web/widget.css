@@ -93,6 +93,9 @@
   }
 }
 
+/* KDE Plasma (pages from the Linux daemon, ?host=kde): no board title bar over the page. */
+html.host-kde { --title-bar: 12px; }
+
 /* Preview outside the board only (the widget page itself is transparent). */
 html.preview { background: #272727; }
 @media (prefers-color-scheme: light) { html.preview { background: #f3f3f3; } }

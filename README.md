@@ -1,6 +1,6 @@
 # OPNsense Widgets
 
-Windows 11 Widget Board (Win+W) widgets for keeping an eye on an OPNsense router without opening its web UI.
+Windows 11 Widget Board (Win+W) widgets for keeping an eye on an OPNsense router without opening its web UI. The same widgets also run on KDE Plasma 6 (see [KDE Plasma (Linux)](#kde-plasma-linux)).
 
 The app is a native widget provider (C#, .NET 8, Windows App SDK) packaged as an MSIX. It talks to the OPNsense REST API and renders Adaptive Cards, with charts drawn by SkiaSharp.
 
@@ -120,6 +120,39 @@ Settings and credentials live outside the MSIX package, so they survive reinstal
 
 `dhcpBackend` is not used yet. The backend is always auto-detected.
 
+## KDE Plasma (Linux)
+
+The same three widgets run on KDE Plasma 6. A small user service, `opnsense-widgetsd`, does what the Windows provider does: it polls OPNsense and serves the widget pages on `127.0.0.1:47820`. Each Plasma widget shows its page in an embedded browser.
+
+Requirements: Plasma 6, Qt WebEngine for QML (Fedora: `qt6-qtwebengine`), and `secret-tool` (Fedora: `libsecret`) to keep the API key in KWallet or GNOME Keyring.
+
+Build the daemon (from Windows or Linux, any machine with the .NET 8 SDK), then copy the `linux/` folder to the Linux machine and run the installer there:
+
+```bash
+dotnet publish src/OPNsenseWidgets.Linux -c Release -r linux-x64 -o linux/dist
+```
+
+```bash
+./linux/install.sh linux/dist/opnsense-widgetsd
+```
+
+The installer puts the daemon in `~/.local/lib/opnsense-widgets/`, enables the `opnsense-widgetsd` systemd user service and installs three widgets: **OPNsense DHCP Leases**, **OPNsense Traffic** and **OPNsense Firewall**. Add them from the desktop with right-click > **Add or Manage Widgets**. On the desktop they show the widget itself; in a panel they show an icon that opens the widget.
+
+Setup works like on Windows: a new widget shows **Connect your router**; click **Set up**. To change the connection later, right-click the widget > **OPNsense Connection**.
+
+| What            | Where (Linux) |
+|-----------------|---------------|
+| API key/secret  | Desktop keyring through Secret Service (`secret-tool lookup service opnsense-widgets account api`). Without one, `~/.opnsense-widgets/credentials.json` (mode 600) |
+| Settings        | `~/.opnsense-widgets/settings.json` |
+| Log             | `journalctl --user -u opnsense-widgetsd` |
+
+Notes:
+
+- The service only answers on loopback and rejects requests addressed to other host names or coming from other sites, so web pages can't read your lease list through it.
+- Widgets only refresh while a page is open (on the desktop, or a panel popup that is showing).
+- To use another port, set `OPNSENSE_WIDGETS_PORT` in the service (`systemctl --user edit opnsense-widgetsd`) and the same port in each widget's settings.
+- `./linux/uninstall.sh` removes the widgets and the service; `--purge` also removes settings and the stored key.
+
 ## OPNsense API user
 
 Don't use the root account. Create a user that can only read what the widgets need:
@@ -165,10 +198,11 @@ Other tips:
 
 ## Adding a widget
 
-1. Create `src/OPNsenseWidgets/Widgets/<Name>/<Name>Widget.cs` implementing `IWidgetDefinition`.
-2. Add `SmallTemplate.json`, `MediumTemplate.json` and `LargeTemplate.json` under `Widgets/<Name>/Templates/`.
+1. Create `src/OPNsenseWidgets.Core/Widgets/<Name>/<Name>Widget.cs` implementing `IWebWidgetDefinition`.
+2. Add the page under `Widgets/<Name>/Web/index.html`, and `SmallTemplate.json`, `MediumTemplate.json` and `LargeTemplate.json` (the fallback cards) under `Widgets/<Name>/Templates/`.
 3. Add a `<Definition>` entry in `src/OPNsenseWidgets.Package/Package.appxmanifest`.
-4. Register it in `Program.cs`: `services.AddSingleton<IWidgetDefinition, <Name>Widget>();`
+4. Register it in both `Program.cs` files (Windows and Linux): `services.AddSingleton<IWidgetDefinition, <Name>Widget>();`
+5. Add a line to the `widgets` list in `linux/install.sh` for the Plasma widget.
 
 Keep in mind:
 
@@ -180,24 +214,33 @@ Keep in mind:
 
 ```
 src/
-  OPNsenseWidgets/              Widget provider (COM server, console app)
-    Program.cs                  Entry point, DI setup, COM registration
-    Provider/                   IWidgetProvider implementation, COM factory, template loading
+  OPNsenseWidgets.Core/         Shared by Windows and Linux (net8.0)
+    Hosting/                    WidgetController (views, page messages, actions, refresh), IWidgetHost, WebAssets
     Api/                        OPNsense HTTP client (Basic Auth) and response models
-    Configuration/              Settings file and Credential Manager access
-    Widgets/                    One folder per widget: definition class + Adaptive Card templates
-    Templates/                  Shared templates: Configuration, Error, Unconfigured
-    Rendering/                  SkiaSharp renderers: device cards, sparkline, traffic charts, donut
+    Configuration/              Settings file, credential store interface
+    Widgets/                    One folder per widget: definition class, web page, fallback Adaptive Cards
+    Templates/                  Shared fallback cards: Configuration, Error, Unconfigured
+    Rendering/                  SkiaSharp renderers for the fallback cards
     Refresh/                    Background timer that refreshes visible widgets
     Logging/                    File logger for the debug log
+  OPNsenseWidgets/              Windows widget provider (COM server, console app)
+    Program.cs                  Entry point, DI setup, COM registration
+    Provider/                   IWidgetProvider + IWidgetHost for the Widget Board, COM factory
+    Platform/                   Credential Manager store, Downloads folder
   OPNsenseWidgets.Package/      MSIX packaging project (x64 + ARM64)
     Package.appxmanifest        COM server and widget definitions
+  OPNsenseWidgets.Linux/        opnsense-widgetsd: Kestrel on 127.0.0.1, pages + WebSocket (PageHost)
+linux/
+  plasmoid/                     Plasma 6 widget template (install.sh stamps one per widget)
+  systemd/                      User service for opnsense-widgetsd
+  install.sh, uninstall.sh
 ```
 
 ## Tech stack
 
-- C# / .NET 8 (`net8.0-windows10.0.19041.0`)
+- C# / .NET 8 (`net8.0-windows10.0.19041.0` for Windows, `net8.0` for Core and the Linux daemon)
 - Windows App SDK 1.8 (widget provider APIs)
 - Adaptive Cards 1.5
 - SkiaSharp for chart and card images
 - AdysTech.CredentialManager for Windows Credential Manager
+- Linux: ASP.NET Core (Kestrel, WebSockets), Plasma 6 QML with Qt WebEngine, libsecret `secret-tool`

@@ -1,20 +1,92 @@
 // Shared bootstrap for the web widget pages (Widgets/<Name>/Web/index.html).
 //
-// Protocol with the provider (OPNsenseWidgetProvider):
+// Protocol with the provider (WidgetController, shared by every host):
 //   page -> provider: {type:"ready", w, h, dpr} on load, while waiting for data, and after resizes
 //                     {type:"refresh"} to fetch now
 //                     {type:"action", verb, data} for the settings and status pages (same verbs as the cards)
 //   provider -> page: {type:"data", view, size:"small|medium|large", payload:{...}}
 //                     view is "data" (widget pages), "settings" or "status"; a page ignores other views.
+//                     {type:"navigate", path} (Linux daemon only): the widget switched views, load that page.
 //
-// Opened in a normal browser (no WebView2 bridge) a page runs on demo data instead;
+// Hosts:
+//   Windows Widget Board: messages go through the WebView2 bridge (window.chrome.webview).
+//   Linux daemon (KDE Plasma): the page is served from http://127.0.0.1:<port> with ?def=&id= and
+//     talks over a WebSocket to /ws. Optional ?host=kde (no board title bar, size from the viewport)
+//     and ?theme=dark|light (the desktop theme, which the embedded browser may not report).
+//
+// Opened in a normal browser (no bridge) a page runs on demo data instead;
 // add ?size=small|medium|large, otherwise the size is guessed from the window.
 (() => {
   "use strict";
 
-  const bridge = window.chrome && window.chrome.webview;
+  const params = new URLSearchParams(location.search);
+  const bridge = (window.chrome && window.chrome.webview) || socketBridge();
   const preview = !bridge;
-  const previewSize = preview ? new URLSearchParams(location.search).get("size") : null;
+  const previewSize = preview ? params.get("size") : null;
+  // Desktop widgets resize freely, so the layout follows the viewport instead of a board size.
+  const viewportSized = params.get("host") === "kde";
+
+  if (params.get("host")) document.documentElement.classList.add("host-" + params.get("host"));
+  applyTheme(params.get("theme"));
+
+  /**
+   * Same shape as window.chrome.webview (postMessage, addEventListener("message")), over a
+   * WebSocket to the Linux daemon. Reconnects after the daemon restarts and says "ready" again.
+   */
+  function socketBridge() {
+    const id = params.get("id");
+    const def = params.get("def");
+    if (!id || !def || location.protocol !== "http:") return null;
+
+    const listeners = { message: [], open: [] };
+    let socket = null;
+
+    function connect() {
+      const query = new URLSearchParams({ id, def, path: location.pathname });
+      socket = new WebSocket(`ws://${location.host}/ws?${query}`);
+      socket.onopen = () => listeners.open.forEach(fn => fn());
+      socket.onmessage = e => {
+        let message;
+        try { message = JSON.parse(e.data); } catch { return; }
+        if (message && message.type === "navigate" && typeof message.path === "string") {
+          location.replace(message.path + location.search);
+          return;
+        }
+        listeners.message.forEach(fn => fn({ data: message }));
+      };
+      socket.onclose = () => setTimeout(connect, 2000);
+    }
+    connect();
+
+    return {
+      postMessage(text) {
+        if (socket && socket.readyState === WebSocket.OPEN) socket.send(text);
+      },
+      addEventListener(type, fn) {
+        if (listeners[type]) listeners[type].push(fn);
+      }
+    };
+  }
+
+  /**
+   * Forces the dark or light palette: drops the (prefers-color-scheme: light) rules for "dark",
+   * or applies them unconditionally for "light". Without a theme the system preference decides.
+   */
+  function applyTheme(theme) {
+    if (theme !== "dark" && theme !== "light") return;
+    for (const sheet of document.styleSheets) {
+      let rules;
+      try { rules = sheet.cssRules; } catch { continue; }
+      for (let i = rules.length - 1; i >= 0; i--) {
+        const rule = rules[i];
+        if (!(rule instanceof CSSMediaRule) || !/prefers-color-scheme:\s*light/.test(rule.conditionText)) continue;
+        const inner = Array.from(rule.cssRules, r => r.cssText);
+        sheet.deleteRule(i);
+        if (theme === "light") inner.reverse().forEach(text => sheet.insertRule(text, i));
+      }
+    }
+    document.documentElement.style.colorScheme = theme;
+  }
 
   let state = null;      // last data message
   let renderFn = null;
@@ -36,7 +108,7 @@
   }
 
   function currentSize() {
-    return (state && state.size) || previewSize || sizeFromViewport();
+    return (!viewportSized && state && state.size) || previewSize || sizeFromViewport();
   }
 
   function draw(fresh) {
@@ -80,6 +152,8 @@
 
     if (bridge) {
       bridge.addEventListener("message", e => receive(e.data));
+      // WebSocket bridge only: (re)connected, so the daemon needs to hear "ready" again.
+      bridge.addEventListener("open", sayReady);
       // The provider may still be starting up (or restarting), so keep asking until data arrives.
       sayReady();
       const retry = setInterval(() => {

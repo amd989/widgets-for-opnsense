@@ -1,0 +1,17 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Alejandro Mora"
+            }
+        ],
+        "Category": "System Information",
+        "Description": "@DESCRIPTION@",
+        "Icon": "@ICON@",
+        "Id": "@PLUGIN_ID@",
+        "Name": "@NAME@",
+        "Version": "1.0"
+    },
+    "KPackageStructure": "Plasma/Applet",
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

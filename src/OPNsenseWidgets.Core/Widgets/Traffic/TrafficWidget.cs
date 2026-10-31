@@ -1,7 +1,7 @@
 using System.Text.Json;
 using OPNsenseWidgets.Api;
 using OPNsenseWidgets.Api.Models;
-using OPNsenseWidgets.Provider;
+using OPNsenseWidgets.Hosting;
 using OPNsenseWidgets.Rendering;
 
 namespace OPNsenseWidgets.Widgets.Traffic;

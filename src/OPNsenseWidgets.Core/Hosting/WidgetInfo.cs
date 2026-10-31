@@ -1,4 +1,4 @@
-namespace OPNsenseWidgets.Provider;
+namespace OPNsenseWidgets.Hosting;
 
 public sealed class WidgetInfo
 {

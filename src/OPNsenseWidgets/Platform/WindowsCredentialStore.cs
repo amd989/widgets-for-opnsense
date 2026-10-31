@@ -1,8 +1,9 @@
 using AdysTech.CredentialManager;
+using OPNsenseWidgets.Configuration;
 
-namespace OPNsenseWidgets.Configuration;
+namespace OPNsenseWidgets.Platform;
 
-public sealed class CredentialStore : ICredentialStore
+public sealed class WindowsCredentialStore : ICredentialStore
 {
     private const string TargetName = "OPNsenseWidgets/ApiCredentials";
 

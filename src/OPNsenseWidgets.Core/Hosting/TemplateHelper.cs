@@ -1,6 +1,6 @@
 using System.Reflection;
 
-namespace OPNsenseWidgets.Provider;
+namespace OPNsenseWidgets.Hosting;
 
 public static class TemplateHelper
 {

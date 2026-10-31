@@ -1,32 +1,17 @@
-using System.Reflection;
 using System.Text.Json.Nodes;
+using OPNsenseWidgets.Hosting;
 
 namespace OPNsenseWidgets.Provider;
 
 /// <summary>
-/// Serves web widget files embedded from Widgets/&lt;Name&gt;/Web/ for requests to <see cref="Origin"/>.
+/// Serves <see cref="WebAssets"/> to the Widget Board for requests to <see cref="Origin"/>.
 /// URL https://opnsense-widget.test/DhcpLeases/Web/index.html maps to Widgets/DhcpLeases/Web/index.html.
-/// URLs mirror the source tree so relative links (../../Shared/Web/widget.css) work both in the
-/// widget and when a page is opened from disk for preview.
 /// The origin does not exist on the network; the Widget Board routes it to the provider through
 /// the manifest WebRequestFilter and IWidgetResourceProvider.
 /// </summary>
 public static class WebContent
 {
     public const string Origin = "https://opnsense-widget.test";
-
-    /// <summary>Connection settings, shown while a widget is customized.</summary>
-    public const string SettingsPath = "Shared/Web/settings.html";
-    /// <summary>"Not set up" and "connection error" states.</summary>
-    public const string StatusPath = "Shared/Web/status.html";
-
-    private static readonly Assembly Assembly = typeof(WebContent).Assembly;
-
-    // Lower-cased "folder/web/file" -> manifest resource name.
-    private static readonly Dictionary<string, string> Resources = Assembly.GetManifestResourceNames()
-        .Select(name => (name, match: System.Text.RegularExpressions.Regex.Match(name, @"^OPNsenseWidgets\.Widgets\.(\w+)\.Web\.(.+)$")))
-        .Where(x => x.match.Success)
-        .ToDictionary(x => $"{x.match.Groups[1].Value}/web/{x.match.Groups[2].Value}".ToLowerInvariant(), x => x.name);
 
     public static string UrlFor(string path) => $"{Origin}/{path.TrimStart('/')}";
 
@@ -50,28 +35,6 @@ public static class WebContent
         if (!string.Equals(parsed.GetLeftPart(UriPartial.Authority), Origin, StringComparison.OrdinalIgnoreCase))
             return false;
 
-        var key = parsed.AbsolutePath.Trim('/').ToLowerInvariant();
-        if (!Resources.TryGetValue(key, out var resourceName))
-            return false;
-
-        using var stream = Assembly.GetManifestResourceStream(resourceName);
-        if (stream is null)
-            return false;
-
-        using var buffer = new MemoryStream();
-        stream.CopyTo(buffer);
-        content = buffer.ToArray();
-        contentType = Path.GetExtension(key) switch
-        {
-            ".html" => "text/html; charset=utf-8",
-            ".js" => "text/javascript; charset=utf-8",
-            ".css" => "text/css; charset=utf-8",
-            ".json" => "application/json",
-            ".svg" => "image/svg+xml",
-            ".png" => "image/png",
-            ".woff2" => "font/woff2",
-            _ => "application/octet-stream"
-        };
-        return true;
+        return WebAssets.TryGet(parsed.AbsolutePath, out content, out contentType);
     }
 }

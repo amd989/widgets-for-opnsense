@@ -3,7 +3,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OPNsenseWidgets.Api;
 using OPNsenseWidgets.Configuration;
+using OPNsenseWidgets.Hosting;
 using OPNsenseWidgets.Logging;
+using OPNsenseWidgets.Platform;
 using OPNsenseWidgets.Provider;
 using OPNsenseWidgets.Refresh;
 using OPNsenseWidgets.Widgets;
@@ -52,7 +54,8 @@ internal class Program
 
         // Configuration
         services.AddSingleton<ISettingsManager, SettingsManager>();
-        services.AddSingleton<ICredentialStore, CredentialStore>();
+        services.AddSingleton<ICredentialStore, WindowsCredentialStore>();
+        services.AddSingleton<IPlatformPaths, WindowsPaths>();
 
         // API
         services.AddSingleton<IOPNsenseApiClientFactory, OPNsenseApiClientFactory>();
@@ -63,7 +66,8 @@ internal class Program
         services.AddSingleton<IWidgetDefinition, TrafficWidget>();
         services.AddSingleton<IWidgetDefinition, FirewallWidget>();
 
-        // Provider and factory
+        // Shared widget logic, with the Widget Board provider as its host
+        services.AddSingleton<WidgetController>();
         services.AddSingleton<OPNsenseWidgetProvider>();
         services.AddSingleton<WidgetProviderFactory>();
         services.AddSingleton<RefreshService>();
@@ -113,7 +117,7 @@ internal class Program
         });
 
         logger.LogInformation("Waiting for EmptyEvent...");
-        provider.EmptyEvent.Wait();
+        serviceProvider.GetRequiredService<WidgetController>().EmptyEvent.Wait();
 
         logger.LogInformation("EmptyEvent fired, shutting down");
         refreshService.Stop();

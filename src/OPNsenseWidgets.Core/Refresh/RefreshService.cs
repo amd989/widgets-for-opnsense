@@ -1,11 +1,11 @@
 using OPNsenseWidgets.Configuration;
-using OPNsenseWidgets.Provider;
+using OPNsenseWidgets.Hosting;
 
 namespace OPNsenseWidgets.Refresh;
 
 public sealed class RefreshService : IDisposable
 {
-    private readonly OPNsenseWidgetProvider _provider;
+    private readonly WidgetController _controller;
     private readonly ISettingsManager _settingsManager;
     private Timer? _timer;
     private readonly CancellationTokenSource _cts = new();
@@ -15,9 +15,9 @@ public sealed class RefreshService : IDisposable
     private DateTime _settingsLoadedAt = DateTime.MinValue;
     private static readonly TimeSpan SettingsTtl = TimeSpan.FromSeconds(30);
 
-    public RefreshService(OPNsenseWidgetProvider provider, ISettingsManager settingsManager)
+    public RefreshService(WidgetController controller, ISettingsManager settingsManager)
     {
-        _provider = provider;
+        _controller = controller;
         _settingsManager = settingsManager;
     }
 
@@ -46,7 +46,7 @@ public sealed class RefreshService : IDisposable
         var globalInterval = Math.Clamp(_cachedSettings.RefreshIntervalSeconds, 10, 300);
         var now = DateTime.Now;
 
-        var activeWidgets = _provider.RunningWidgets
+        var activeWidgets = _controller.Widgets
             .Where(kv => kv.Value.IsActive && !kv.Value.InCustomization)
             .Select(kv => kv.Value)
             .ToList();
@@ -55,17 +55,20 @@ public sealed class RefreshService : IDisposable
         {
             // Determine this widget's desired interval
             var desiredSeconds = 0;
-            if (_provider.Definitions.TryGetValue(widget.DefinitionId, out var def))
+            if (_controller.Definitions.TryGetValue(widget.DefinitionId, out var def))
                 desiredSeconds = def.RefreshIntervalSeconds;
             if (desiredSeconds <= 0)
                 desiredSeconds = globalInterval;
 
-            var elapsed = widget.LastRefresh.HasValue
-                ? (now - widget.LastRefresh.Value).TotalSeconds
+            // Count from the last attempt, not the last success: a widget that is unconfigured or
+            // failing would otherwise retry (and re-render its page) every tick.
+            var last = widget.LastRefreshAttempt ?? widget.LastRefresh;
+            var elapsed = last.HasValue
+                ? (now - last.Value).TotalSeconds
                 : double.MaxValue;
 
             if (elapsed >= desiredSeconds)
-                _ = _provider.RefreshWidgetAsync(widget);
+                _ = _controller.RefreshAsync(widget);
         }
     }
 

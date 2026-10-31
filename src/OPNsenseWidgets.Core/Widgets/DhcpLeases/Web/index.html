@@ -372,31 +372,39 @@
   nextBtn.addEventListener("click", () => goTo(pageIndex + 1, true));
 
   // Swipe / drag between pages.
+  // The host can take the pointer mid-drag (Plasma does, to move desktop widgets), so pointerup
+  // may never arrive: a move with no button held, or losing the capture, also ends the drag.
+  // Otherwise plain hovering would keep sliding the cards.
   let dragStartX = null, dragDx = 0;
   carousel.addEventListener("pointerdown", e => {
-    if (pageCount <= 1) return;
+    if (pageCount <= 1 || e.button !== 0) return;
     dragStartX = e.clientX;
     dragDx = 0;
     carousel.setPointerCapture(e.pointerId);
   });
   carousel.addEventListener("pointermove", e => {
     if (dragStartX === null) return;
+    if (e.pointerType === "mouse" && (e.buttons & 1) === 0) {
+      endDrag();
+      return;
+    }
     dragDx = e.clientX - dragStartX;
     if (Math.abs(dragDx) > 3) carousel.classList.add("dragging");
     const atEdge = (pageIndex === 0 && dragDx > 0) || (pageIndex === pageCount - 1 && dragDx < 0);
     const offset = atEdge ? dragDx / 3 : dragDx;
     track.style.transform = `translateX(calc(${-pageIndex * 100}% + ${offset}px))`;
   });
-  const endDrag = () => {
+  function endDrag() {
     if (dragStartX === null) return;
     carousel.classList.remove("dragging");
     const threshold = carousel.clientWidth * 0.18;
     const target = dragDx < -threshold ? pageIndex + 1 : dragDx > threshold ? pageIndex - 1 : pageIndex;
     dragStartX = null;
     goTo(target, true);
-  };
+  }
   carousel.addEventListener("pointerup", endDrag);
   carousel.addEventListener("pointercancel", endDrag);
+  carousel.addEventListener("lostpointercapture", endDrag);
 
   // Horizontal wheel / touchpad swipe. Vertical wheel is left to the board.
   let wheelLock = 0;
