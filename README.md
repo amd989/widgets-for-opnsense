@@ -2,7 +2,7 @@
 
 Windows 11 Widget Board (Win+W) widgets for keeping an eye on an OPNsense router without opening its web UI. The same widgets also run on KDE Plasma 6 (see [KDE Plasma (Linux)](#kde-plasma-linux)), and on GNOME as a top bar button (see [GNOME (Linux)](#gnome-linux)).
 
-The app is a native widget provider (C#, .NET 8, Windows App SDK) packaged as an MSIX. It talks to the OPNsense REST API and renders Adaptive Cards, with charts drawn by SkiaSharp.
+The app is a native widget provider (C#, .NET 8, Windows App SDK) packaged as an MSIX. It talks to the OPNsense REST API and shows each widget as an HTML page served from the app itself. Hosts that can't show web content get Adaptive Cards instead, with charts drawn by SkiaSharp.
 
 ## Widgets
 
@@ -223,15 +223,16 @@ Other tips:
 ## Adding a widget
 
 1. Create `src/OPNsenseWidgets.Core/Widgets/<Name>/<Name>Widget.cs` implementing `IWebWidgetDefinition`.
-2. Add the page under `Widgets/<Name>/Web/index.html`, and `SmallTemplate.json`, `MediumTemplate.json` and `LargeTemplate.json` (the fallback cards) under `Widgets/<Name>/Templates/`.
-3. Add a `<Definition>` entry in `src/OPNsenseWidgets.Package/Package.appxmanifest`.
+2. Add the page under `Widgets/<Name>/Web/index.html`, using `../../Shared/Web/widget.css` and `widget.js` (files under `Web/` are embedded automatically). Add `SmallTemplate.json`, `MediumTemplate.json` and `LargeTemplate.json` (the fallback cards) under `Widgets/<Name>/Templates/`.
+3. Add a `<Definition>` entry in `src/OPNsenseWidgets.Package/Package.appxmanifest` with `WebRequestFilter="https://opnsense-widget.test/*"`, so the board asks the app for the page.
 4. Register it in both `Program.cs` files (Windows and Linux): `services.AddSingleton<IWidgetDefinition, <Name>Widget>();`
 5. Add a line to the `widgets` list in `linux/install.sh` for the Plasma widget.
 6. For GNOME, add it to `DEFINITIONS` in `linux/gnome/daemon.js` and give it a section in `linux/gnome/indicator.js` (GNOME draws the menu natively from the same payload).
+7. Re-render the widget picker screenshots with `design/capture-gallery.ps1` (serve the repo root on port 8766 first).
 
 Keep in mind:
 
-- Widget canvas sizes are fixed by Windows and Adaptive Cards can't scroll. Everything must fit.
+- Widget sizes are fixed by Windows (small 302x148, medium 302x306, large 302x464) and nothing scrolls. Everything must fit, in both the page and the fallback cards.
 - The Widget Board already shows the widget name, so templates don't need a title.
 - Set `RefreshIntervalSeconds` on the definition to override the global interval (Traffic and Firewall use 1).
 
@@ -265,8 +266,9 @@ linux/
 ## Tech stack
 
 - C# / .NET 8 (`net8.0-windows10.0.19041.0` for Windows, `net8.0` for Core and the Linux daemon)
-- Windows App SDK 1.8 (widget provider APIs)
-- Adaptive Cards 1.5
-- SkiaSharp for chart and card images
+- Windows App SDK 1.8 (widget provider APIs, web content widgets)
+- HTML/CSS/JS widget pages, embedded in the app
+- Adaptive Cards 1.5 as the fallback
+- SkiaSharp for the fallback cards' chart and card images
 - AdysTech.CredentialManager for Windows Credential Manager
 - Linux: ASP.NET Core (Kestrel, WebSockets), Plasma 6 QML with Qt WebEngine, GNOME Shell extension (GJS, St, libsoup 3, libadwaita preferences), libsecret `secret-tool`
