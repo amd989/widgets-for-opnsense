@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.opnsense-widgets" path="/org/gnome/shell/extensions/opnsense-widgets/">
+    <key name="port" type="i">
+      <range min="1024" max="65535"/>
+      <default>47820</default>
+      <summary>Port of the opnsense-widgetsd service on 127.0.0.1</summary>
+    </key>
+    <key name="panel-label" type="s">
+      <choices>
+        <choice value="devices"/>
+        <choice value="throughput"/>
+        <choice value="none"/>
+      </choices>
+      <default>'devices'</default>
+      <summary>What the top bar button shows next to its icon</summary>
+    </key>
+    <key name="notify-new-devices" type="b">
+      <default>true</default>
+      <summary>Show a notification when a new device joins the network</summary>
+    </key>
+    <key name="config-saved" type="x">
+      <default>0</default>
+      <summary>Set by the preferences window after a working connection is saved, so the indicator refreshes</summary>
+    </key>
+  </schema>
+</schemalist>

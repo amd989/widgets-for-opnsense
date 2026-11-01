@@ -1,0 +1,8 @@
+{
+  "uuid": "opnsense-widgets@alejandro.md",
+  "name": "OPNsense Widgets",
+  "description": "Devices, traffic and firewall activity of your OPNsense router in the top bar, with a notification when a new device joins. Needs the opnsense-widgetsd user service.",
+  "shell-version": ["46", "47", "48", "49", "50"],
+  "settings-schema": "org.gnome.shell.extensions.opnsense-widgets",
+  "version-name": "1.0"
+}

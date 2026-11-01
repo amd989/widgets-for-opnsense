@@ -1,6 +1,6 @@
 # OPNsense Widgets
 
-Windows 11 native widget provider for monitoring an OPNsense router from the Widget Board (Win+W), plus the same widgets on KDE Plasma 6 through a Linux daemon.
+Windows 11 native widget provider for monitoring an OPNsense router from the Widget Board (Win+W), plus the same widgets on KDE Plasma 6 and a GNOME Shell top bar indicator through a Linux daemon.
 
 ## Tech Stack
 
@@ -21,7 +21,8 @@ Widget logic lives in `OPNsenseWidgets.Core` (`WidgetController`): view selectio
 4. Add `<Definition>` entry in `Package.appxmanifest` with `WebRequestFilter="https://opnsense-widget.test/*"`
 5. Register in DI in both `Program.cs` files (Windows and Linux)
 6. Add it to the `widgets` list in `linux/install.sh`
-7. Re-render picker screenshots with `design/capture-gallery.ps1`
+7. GNOME: add it to `DEFINITIONS` in `linux/gnome/daemon.js` and a menu section in `linux/gnome/indicator.js`
+8. Re-render picker screenshots with `design/capture-gallery.ps1`
 
 ## Project Structure
 
@@ -69,6 +70,10 @@ src/
     Platform/                   # SecretServiceCredentialStore (secret-tool, mode-600 file fallback), LinuxPaths
 linux/
   plasmoid/                     # Plasma 6 applet template (WebEngineView); install.sh stamps @...@ per widget
+  gnome/                        # GNOME Shell 46+ extension opnsense-widgets@alejandro.md
+    daemon.js                   # WidgetChannel: the page protocol over Soup 3 WebSockets (also used by prefs)
+    indicator.js                # PanelMenu.Button: panel label, St menu sections, new-device notifications
+    prefs.js                    # Adw preferences: connection (daemon settings actions), top bar options
   systemd/                      # opnsense-widgetsd user unit
   install.sh, uninstall.sh
 ```
@@ -81,7 +86,7 @@ dotnet build src/OPNsenseWidgets/OPNsenseWidgets.csproj
 
 Deploy via Visual Studio: right-click `OPNsenseWidgets.Package` > Deploy. Requires Developer Mode enabled on Windows.
 
-Linux (KDE Plasma 6): `dotnet publish src/OPNsenseWidgets.Linux -c Release -r linux-x64 -o linux/dist`, copy `linux/` to the machine, run `linux/install.sh linux/dist/opnsense-widgetsd`. Log: `journalctl --user -u opnsense-widgetsd`. QML changes to widgets already on screen need `systemctl --user restart plasma-plasmashell`.
+Linux (KDE Plasma 6, GNOME 46+): `dotnet publish src/OPNsenseWidgets.Linux -c Release -r linux-x64 -o linux/dist`, copy `linux/` to the machine, run `linux/install.sh linux/dist/opnsense-widgetsd` (installs the Plasma widgets and/or the GNOME extension, whichever desktop is present). Log: `journalctl --user -u opnsense-widgetsd`. QML changes to widgets already on screen need `systemctl --user restart plasma-plasmashell`.
 
 ## KDE Plasma (Linux)
 
@@ -90,6 +95,14 @@ Linux (KDE Plasma 6): `dotnet publish src/OPNsenseWidgets.Linux -c Release -r li
 - **Page query**: `def` (DefinitionId), `id` (`kde-<Plasmoid.id>`), `host=kde` (12px top padding instead of the 44px title bar, size from viewport), `theme=dark|light` (Plasma theme; `widget.js` rewrites the light media rules because QtWebEngine may not report it).
 - **Security**: loopback only, and requests must have Host (and Origin, when present) of `127.0.0.1:<port>` or `localhost:<port>`, which blocks DNS rebinding and other sites.
 - **Active = page connected**: polling runs only while a page holds a socket, like "only while the board is open" on Windows.
+
+## GNOME (Linux)
+
+- **No web content in GNOME Shell**, so the extension draws the widgets natively (St) from the same `data` payloads. It connects to `/ws` like a page (`id=gnome-dhcp|gnome-traffic|gnome-firewall`) and reconnects with the new path on `navigate`.
+- **Channels only while needed**: Traffic and Firewall poll every second, so they connect only while the menu is open (Traffic also when the panel shows throughput). DHCP stays connected for the count and the new-device notification (first reading after login is the baseline).
+- **Preferences reuse the settings actions**: `prefs.js` connects as `gnome-prefs` on `Shared/Web/settings.html` without following `navigate`, sends `openSettings`, then `testConnection` (saves and tests), `importKeyFile`, and `cancelConfig` on close. A good save bumps the `config-saved` key so the indicator refreshes at once.
+- **GNOME 46+ only** (ESM, `MessageTray.Notification({source,...})`); St.BoxLayout uses `orientation` from 48, `vertical` before.
+- Updating an enabled extension on Wayland needs a log out and in. Log: `journalctl --user -b /usr/bin/gnome-shell`.
 
 ## Key Design Decisions
 

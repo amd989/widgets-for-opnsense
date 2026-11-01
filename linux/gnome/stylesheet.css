@@ -1,0 +1,136 @@
+/* Colors match the widget pages: blue new / download, green active / upload, purple reserved. */
+
+.opnsense-panel-label {
+  padding-left: 4px;
+  font-feature-settings: "tnum";
+}
+
+.opnsense-new-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  margin-left: 2px;
+  background-color: #3584e4;
+}
+
+.opnsense-menu {
+  min-width: 360px;
+  max-width: 380px;
+  spacing: 14px;
+  padding: 6px 16px 8px;
+}
+
+.opnsense-section {
+  spacing: 6px;
+}
+
+.opnsense-caption {
+  font-size: 0.75em;
+  font-weight: bold;
+}
+
+.opnsense-head {
+  spacing: 6px;
+}
+
+.opnsense-hero {
+  font-size: 1.7em;
+  font-weight: 800;
+  font-feature-settings: "tnum";
+}
+
+.opnsense-hero-unit {
+  padding-top: 6px;
+}
+
+.opnsense-stats {
+  spacing: 4px;
+}
+
+.opnsense-stat {
+  spacing: 4px;
+  padding-left: 6px;
+}
+
+.opnsense-stat-num {
+  font-weight: bold;
+  font-feature-settings: "tnum";
+  padding-left: 6px;
+}
+
+.opnsense-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 4px;
+}
+
+.opnsense-small {
+  font-size: 0.85em;
+}
+
+.opnsense-row {
+  spacing: 8px;
+}
+
+.opnsense-device {
+  spacing: 8px;
+  padding: 2px 0;
+}
+
+.opnsense-bar {
+  width: 3px;
+  border-radius: 2px;
+}
+
+.opnsense-device-name,
+.opnsense-iface {
+  font-weight: bold;
+}
+
+.opnsense-badge {
+  font-size: 0.7em;
+  font-weight: bold;
+  color: #9141ac;
+  border: 1px solid rgba(145, 65, 172, 0.5);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
+.opnsense-new { background-color: #3584e4; }
+.opnsense-active { background-color: #2ec27e; }
+.opnsense-reserved { background-color: #9141ac; }
+.opnsense-stale { background-color: #77767b; }
+
+.opnsense-reading {
+  font-size: 1.25em;
+  font-weight: bold;
+  font-feature-settings: "tnum";
+}
+
+.opnsense-down { color: #3584e4; }
+.opnsense-up { color: #2ec27e; }
+
+.opnsense-rate {
+  font-feature-settings: "tnum";
+}
+
+.opnsense-spark {
+  height: 36px;
+}
+
+.opnsense-rule {
+  font-size: 0.9em;
+}
+
+.opnsense-message {
+  spacing: 4px;
+  padding: 6px 0;
+}
+
+.opnsense-message-title {
+  font-weight: bold;
+}
+
+.opnsense-footer {
+  padding-top: 2px;
+}

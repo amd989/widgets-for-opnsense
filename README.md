@@ -1,6 +1,6 @@
 # OPNsense Widgets
 
-Windows 11 Widget Board (Win+W) widgets for keeping an eye on an OPNsense router without opening its web UI. The same widgets also run on KDE Plasma 6 (see [KDE Plasma (Linux)](#kde-plasma-linux)).
+Windows 11 Widget Board (Win+W) widgets for keeping an eye on an OPNsense router without opening its web UI. The same widgets also run on KDE Plasma 6 (see [KDE Plasma (Linux)](#kde-plasma-linux)), and on GNOME as a top bar button (see [GNOME (Linux)](#gnome-linux)).
 
 The app is a native widget provider (C#, .NET 8, Windows App SDK) packaged as an MSIX. It talks to the OPNsense REST API and renders Adaptive Cards, with charts drawn by SkiaSharp.
 
@@ -153,6 +153,30 @@ Notes:
 - To use another port, set `OPNSENSE_WIDGETS_PORT` in the service (`systemctl --user edit opnsense-widgetsd`) and the same port in each widget's settings.
 - `./linux/uninstall.sh` removes the widgets and the service; `--purge` also removes settings and the stored key.
 
+## GNOME (Linux)
+
+GNOME has no desktop widgets, so on GNOME the widgets become a top bar button. It shows the device count (or WAN throughput, or just the icon) and a dot while new devices are around. Its menu has the newest devices, live traffic per interface and the busiest firewall rules. A notification pops up when a device joins the network for the first time.
+
+It uses the same `opnsense-widgetsd` service as Plasma. Requirements: GNOME Shell 46 or newer and `secret-tool` (Fedora: `libsecret`). The same `install.sh` installs the GNOME Shell extension (`opnsense-widgets@alejandro.md`) when it finds GNOME Shell:
+
+```bash
+./linux/install.sh linux/dist/opnsense-widgetsd
+```
+
+Log out and in again so GNOME Shell sees the new extension, then enable it (the installer does this when it can):
+
+```bash
+gnome-extensions enable opnsense-widgets@alejandro.md
+```
+
+Set up the connection from the top bar button > **Settings…** (or the Extensions app). It has the same fields as the widgets' settings, including **Import Key from Downloads**. **Save and Test** saves and checks the connection in one step. The **Top Bar** page chooses what the button shows and turns notifications on or off.
+
+Notes:
+
+- Devices stay connected, so the count and notifications stay current. Traffic and Firewall only poll the router while the menu is open (Traffic also when the button shows throughput).
+- Updating an enabled extension takes effect after logging out and in again.
+- If the service uses another port, set the same port on the **Top Bar** page.
+
 ## OPNsense API user
 
 Don't use the root account. Create a user that can only read what the widgets need:
@@ -203,6 +227,7 @@ Other tips:
 3. Add a `<Definition>` entry in `src/OPNsenseWidgets.Package/Package.appxmanifest`.
 4. Register it in both `Program.cs` files (Windows and Linux): `services.AddSingleton<IWidgetDefinition, <Name>Widget>();`
 5. Add a line to the `widgets` list in `linux/install.sh` for the Plasma widget.
+6. For GNOME, add it to `DEFINITIONS` in `linux/gnome/daemon.js` and give it a section in `linux/gnome/indicator.js` (GNOME draws the menu natively from the same payload).
 
 Keep in mind:
 
@@ -232,6 +257,7 @@ src/
   OPNsenseWidgets.Linux/        opnsense-widgetsd: Kestrel on 127.0.0.1, pages + WebSocket (PageHost)
 linux/
   plasmoid/                     Plasma 6 widget template (install.sh stamps one per widget)
+  gnome/                        GNOME Shell extension: top bar indicator, preferences, schema
   systemd/                      User service for opnsense-widgetsd
   install.sh, uninstall.sh
 ```
@@ -243,4 +269,4 @@ linux/
 - Adaptive Cards 1.5
 - SkiaSharp for chart and card images
 - AdysTech.CredentialManager for Windows Credential Manager
-- Linux: ASP.NET Core (Kestrel, WebSockets), Plasma 6 QML with Qt WebEngine, libsecret `secret-tool`
+- Linux: ASP.NET Core (Kestrel, WebSockets), Plasma 6 QML with Qt WebEngine, GNOME Shell extension (GJS, St, libsoup 3, libadwaita preferences), libsecret `secret-tool`
