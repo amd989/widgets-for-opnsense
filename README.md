@@ -272,3 +272,7 @@ linux/
 - SkiaSharp for the fallback cards' chart and card images
 - AdysTech.CredentialManager for Windows Credential Manager
 - Linux: ASP.NET Core (Kestrel, WebSockets), Plasma 6 QML with Qt WebEngine, GNOME Shell extension (GJS, St, libsoup 3, libadwaita preferences), libsecret `secret-tool`
+
+## License
+
+MIT. See [LICENSE](LICENSE).
