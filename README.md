@@ -280,3 +280,5 @@ linux/
 MIT. See [LICENSE](LICENSE).
 
 [OPNsense](https://opnsense.org)® is a registered trademark of Deciso B.V. This project is not affiliated with or endorsed by Deciso B.V. or the OPNsense project. The name is used with their permission.
+
+Privacy: see [PRIVACY.md](PRIVACY.md). The widgets only talk to your own firewall.
