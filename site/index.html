@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Widgets for OPNsense</title>
+<meta name="description" content="DHCP leases, live traffic and firewall rules from your OPNsense firewall, in the Windows 11 Widget Board, KDE Plasma 6 and the GNOME top bar. Free and open source.">
+<meta property="og:title" content="Widgets for OPNsense">
+<meta property="og:description" content="Your OPNsense firewall's DHCP leases, traffic and firewall rules, one keystroke away.">
+<meta property="og:image" content="https://amd989.github.io/widgets-for-opnsense/assets/Screenshot-Dark.png">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0e1113">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<header class="nav">
+  <a class="brand" href="#top" aria-label="Widgets for OPNsense, home">
+    <img src="assets/logo.svg" alt="" width="26" height="26">
+    <span>Widgets <em>for</em> OPNsense</span>
+  </a>
+  <nav aria-label="Sections">
+    <a href="#demo">Demo</a>
+    <a href="#widgets">Widgets</a>
+    <a href="#platforms">Platforms</a>
+    <a href="#setup">Setup</a>
+    <a class="nav-gh" href="https://github.com/amd989/widgets-for-opnsense">GitHub</a>
+  </nav>
+</header>
+
+<main id="top">
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-grid" aria-hidden="true"></div>
+    <div class="hero-copy">
+      <p class="eyebrow reveal" style="--d:0">desktop widgets / opnsense api / read only</p>
+      <h1 class="reveal" style="--d:1">Your firewall,<br>one keystroke <span class="hl">away.</span></h1>
+      <p class="lede reveal" style="--d:2">
+        See who just joined your network, how busy the WAN is, and which firewall rules are doing the work,
+        without opening the OPNsense web UI. Three widgets for the Windows 11 Widget Board, KDE Plasma 6 and the GNOME top bar.
+      </p>
+      <div class="cta reveal" style="--d:3">
+        <a class="btn btn-primary" href="https://github.com/amd989/widgets-for-opnsense">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.34c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.87 2.34.67.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.83-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.03 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.66 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 8 0Z"/></svg>
+          Source on GitHub
+        </a>
+        <span class="btn btn-ghost" title="Submitted to the Microsoft Store, waiting for certification">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M0 0h7.5v7.5H0zM8.5 0H16v7.5H8.5zM0 8.5h7.5V16H0zM8.5 8.5H16V16H8.5z"/></svg>
+          Microsoft Store <small>coming soon</small>
+        </span>
+      </div>
+      <p class="meta reveal" style="--d:4">Free <i>/</i> MIT licensed <i>/</i> no account, no telemetry</p>
+    </div>
+
+    <div class="keys reveal" style="--d:2" aria-label="Press Windows key and W to open the Widget Board">
+      <kbd class="key key-win"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M0 0h7.5v7.5H0zM8.5 0H16v7.5H8.5zM0 8.5h7.5V16H0zM8.5 8.5H16V16H8.5z"/></svg></kbd>
+      <span class="plus" aria-hidden="true">+</span>
+      <kbd class="key key-w">W</kbd>
+      <p class="keys-cap">opens the Widget Board</p>
+    </div>
+  </section>
+
+  <!-- Live board -->
+  <section id="demo" class="demo">
+    <div class="demo-head">
+      <div>
+        <p class="eyebrow">live demo</p>
+        <h2>The real widgets, running in your browser.</h2>
+        <p class="sub">These are the same pages the app ships, fed with sample data instead of your router. Switch sizes and themes like you would in the Widget Board.</p>
+      </div>
+      <div class="controls" role="group" aria-label="Demo options">
+        <div class="seg" role="radiogroup" aria-label="Widget size">
+          <button type="button" data-size="small" role="radio" aria-checked="false">Small</button>
+          <button type="button" data-size="medium" role="radio" aria-checked="false">Medium</button>
+          <button type="button" data-size="large" role="radio" aria-checked="true">Large</button>
+        </div>
+        <div class="seg" role="radiogroup" aria-label="Theme">
+          <button type="button" data-theme="dark" role="radio" aria-checked="true">Dark</button>
+          <button type="button" data-theme="light" role="radio" aria-checked="false">Light</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="board" data-theme="dark" data-size="large">
+      <div class="tile" data-widget="DhcpLeases" data-title="DHCP Leases"></div>
+      <div class="tile" data-widget="Traffic" data-title="Traffic"></div>
+      <div class="tile" data-widget="Firewall" data-title="Firewall"></div>
+    </div>
+  </section>
+
+  <!-- Widgets -->
+  <section id="widgets" class="widgets">
+    <p class="eyebrow">three widgets, three sizes each</p>
+    <h2>What you get.</h2>
+
+    <div class="wlist">
+      <article class="w reveal-on-scroll">
+        <span class="num">01</span>
+        <h3>DHCP Leases</h3>
+        <p>The devices on your network, newest first, so the one that just connected is on top. Cards show hostname, IP, vendor and how long ago it joined, color coded as new, active, reserved or stale. Works with ISC DHCP and Kea, detected automatically.</p>
+        <dl class="sizes">
+          <div><dt>S</dt><dd>device count, new devices, one card per page</dd></div>
+          <div><dt>M</dt><dd>new and active counts, 24h activity line, 6 cards per page</dd></div>
+          <div><dt>L</dt><dd>reserved count, 10 cards per page, MAC addresses</dd></div>
+        </dl>
+      </article>
+      <article class="w reveal-on-scroll">
+        <span class="num">02</span>
+        <h3>Traffic</h3>
+        <p>Live download and upload speed, sampled every second from the interface byte counters. The WAN is found by name, and the large size charts every interface, so LAN, VLANs and VPN tunnels each get their own line.</p>
+        <dl class="sizes">
+          <div><dt>S</dt><dd>WAN speed with a small chart</dd></div>
+          <div><dt>M</dt><dd>WAN and LAN charts</dd></div>
+          <div><dt>L</dt><dd>every interface, current WAN speed, total bytes in and out</dd></div>
+        </dl>
+      </article>
+      <article class="w reveal-on-scroll">
+        <span class="num">03</span>
+        <h3>Firewall</h3>
+        <p>Which rules are matching the most traffic right now, as a live donut. Labels come from the rule descriptions you set in OPNsense, and raw pf rules are turned into readable names like "NAT · LAN → WAN".</p>
+        <dl class="sizes">
+          <div><dt>S</dt><dd>donut and the top 3 rules</dd></div>
+          <div><dt>M</dt><dd>top 5 rules with a legend, total evaluations</dd></div>
+          <div><dt>L</dt><dd>top 10 rules, evaluations and packets</dd></div>
+        </dl>
+      </article>
+    </div>
+  </section>
+
+  <!-- Platforms -->
+  <section id="platforms" class="platforms">
+    <p class="eyebrow">same widgets, three desktops</p>
+    <h2>Runs where you work.</h2>
+
+    <div class="plist">
+      <article class="p reveal-on-scroll">
+        <div class="mock mock-win" aria-hidden="true">
+          <div class="mw-board">
+            <span></span><span></span><span class="tall"></span><span></span>
+          </div>
+          <div class="mw-bar"><i></i><i class="on"></i><i></i><i></i></div>
+        </div>
+        <h3>Windows 11 Widget Board</h3>
+        <p>A native widget provider packaged as an MSIX for x64 and ARM64. Press Win+W, add DHCP Leases, Traffic or Firewall, and pick a size from the widget's menu.</p>
+      </article>
+      <article class="p reveal-on-scroll">
+        <div class="mock mock-kde" aria-hidden="true">
+          <div class="mk-widget"><b></b><b></b><b></b></div>
+          <div class="mk-widget small"><u></u></div>
+          <div class="mk-panel"><i></i><i></i><i></i><i class="on"></i></div>
+        </div>
+        <h3>KDE Plasma 6</h3>
+        <p>The same pages as desktop widgets, fed by a small user service on 127.0.0.1. Put them on the desktop, or in a panel where they open from an icon.</p>
+      </article>
+      <article class="p reveal-on-scroll">
+        <div class="mock mock-gnome" aria-hidden="true">
+          <div class="mg-bar"><span>Activities</span><span>Fri 15:56</span><span class="mg-btn"><img src="assets/logo.svg" alt="">64<i></i></span></div>
+          <div class="mg-menu">
+            <p><b>camera-e1-cd04</b><span>now</span></p>
+            <p><b>iphone-alex</b><span>30m</span></p>
+            <p class="t"><b>WAN</b><span>↓ 126 Mbps</span></p>
+          </div>
+        </div>
+        <h3>GNOME Shell 46+</h3>
+        <p>GNOME has no desktop widgets, so they become a top bar button with the device count, a menu with devices, traffic and rules, and a notification when a new device joins.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- Privacy -->
+  <section class="privacy">
+    <div class="flow reveal-on-scroll" aria-label="Your desktop talks only to your OPNsense firewall over its API">
+      <div class="node">
+        <span class="node-k">your desktop</span>
+        <span class="node-v">Widgets for OPNsense</span>
+      </div>
+      <div class="wire"><span>HTTPS / REST API / your API key</span><i></i></div>
+      <div class="node node-fw">
+        <span class="node-k">your network</span>
+        <span class="node-v">OPNsense firewall</span>
+      </div>
+      <div class="nocloud"><s>cloud</s><s>telemetry</s><s>account</s></div>
+    </div>
+    <div class="privacy-copy">
+      <p class="eyebrow">privacy</p>
+      <h2>It only talks to your firewall.</h2>
+      <p>The app reads leases, interface counters and rule statistics from the address you enter, and makes no other connections. The API key stays in Windows Credential Manager, or your desktop keyring on Linux. Self-signed certificates work, since most home firewalls use one.</p>
+      <a class="link" href="https://github.com/amd989/widgets-for-opnsense/blob/main/PRIVACY.md">Read the privacy policy →</a>
+    </div>
+  </section>
+
+  <!-- Setup -->
+  <section id="setup" class="setup">
+    <p class="eyebrow">setup</p>
+    <h2>Up and running in a few minutes.</h2>
+
+    <ol class="steps">
+      <li class="reveal-on-scroll">
+        <h3>Create a read-only API user</h3>
+        <p>In OPNsense, make a group under <span class="path">System › Access › Groups</span>, give it only the privileges the widgets need, add a user to it and create an API key. Don't use root.</p>
+        <table class="priv">
+          <thead><tr><th>Widget</th><th>Privilege</th></tr></thead>
+          <tbody>
+            <tr><td>DHCP Leases (Kea)</td><td>Services: DHCP: Kea(v4)</td></tr>
+            <tr><td>DHCP Leases (ISC)</td><td>Status: DHCP Leases</td></tr>
+            <tr><td>Traffic</td><td>Diagnostics: Netstat</td></tr>
+            <tr><td>Firewall</td><td>Firewall: Rules, Diagnostics: Firewall statistics, Diagnostics: Netstat</td></tr>
+          </tbody>
+        </table>
+        <p class="note">Privilege names move around between OPNsense versions. The <a href="https://github.com/amd989/widgets-for-opnsense#opnsense-api-user">README</a> lists the exact API endpoints.</p>
+      </li>
+      <li class="reveal-on-scroll">
+        <h3>Install</h3>
+        <p><b>Windows:</b> from the Microsoft Store once it's approved, or build and deploy the MSIX from source with Visual Studio.</p>
+        <p><b>Linux:</b> build the service and run the installer. It sets up the Plasma widgets or the GNOME extension, whichever desktop you have.</p>
+        <pre><code>dotnet publish src/OPNsenseWidgets.Linux -c Release -r linux-x64 -o linux/dist
+./linux/install.sh linux/dist/opnsense-widgetsd</code></pre>
+      </li>
+      <li class="reveal-on-scroll">
+        <h3>Connect</h3>
+        <p>Add a widget and open its settings. Enter the firewall address, then either type the key and secret or click <b>Import Key</b> to read the <span class="path">*_apikey.txt</span> file OPNsense just downloaded. <b>Test</b>, <b>Save</b>, done. All widgets share the one connection.</p>
+      </li>
+    </ol>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <div class="foot-row">
+    <a class="brand" href="#top"><img src="assets/logo.svg" alt="" width="22" height="22"><span>Widgets <em>for</em> OPNsense</span></a>
+    <nav aria-label="Project links">
+      <a href="https://github.com/amd989/widgets-for-opnsense">GitHub</a>
+      <a href="https://github.com/amd989/widgets-for-opnsense/issues">Issues</a>
+      <a href="https://github.com/amd989/widgets-for-opnsense/blob/main/PRIVACY.md">Privacy</a>
+      <a href="https://github.com/amd989/widgets-for-opnsense/blob/main/LICENSE">MIT License</a>
+    </nav>
+  </div>
+  <p class="legal">
+    <a href="https://opnsense.org">OPNsense</a>® is a registered trademark of Deciso B.V. This project is not affiliated with or endorsed by Deciso B.V. or the OPNsense project. The name is used with their permission.
+    <br>© 2026 Alejandro Mora.
+  </p>
+</footer>
+
+<script src="site.js"></script>
+</body>
+</html>
