@@ -9,8 +9,8 @@
   IgnorableNamespaces="uap uap3 rescap com">
 
   <Identity
-    Name="OPNsenseWidgets"
-    Publisher="CN=OPNsenseWidgets"
+    Name="AlejandroMoraDaz.WidgetsforOPNsense"
+    Publisher="CN=A312A118-8FCC-4887-ABFD-917260D9441A"
     Version="1.0.0.0" />
 
   <mp:PhoneIdentity PhoneProductId="d40b2e99-b044-4758-9ab5-212c01b368ee"
@@ -18,7 +18,7 @@
 
   <Properties>
     <DisplayName>Widgets for OPNsense</DisplayName>
-    <PublisherDisplayName>Alejandro Mora</PublisherDisplayName>
+    <PublisherDisplayName>Alejandro MD</PublisherDisplayName>
     <Logo>Images\StoreLogo.png</Logo>
   </Properties>
 

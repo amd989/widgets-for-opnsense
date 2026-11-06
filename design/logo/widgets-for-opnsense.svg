@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" width="600" height="600">
+  <title>Widgets for OPNsense</title>
+  <rect x="0" y="0" width="28" height="28" rx="7" fill="#E8590C"/>
+  <rect x="32" y="0" width="28" height="28" rx="7" fill="#5C6670"/>
+  <rect x="0" y="32" width="28" height="28" rx="7" fill="#5C6670"/>
+  <rect x="32" y="32" width="28" height="28" rx="7" fill="#8A949E"/>
+  <rect x="38" y="46" width="4" height="8" rx="1" fill="#FFFFFF"/>
+  <rect x="44" y="41" width="4" height="13" rx="1" fill="#FFFFFF"/>
+  <rect x="50" y="37" width="4" height="17" rx="1" fill="#FFFFFF"/>
+</svg>

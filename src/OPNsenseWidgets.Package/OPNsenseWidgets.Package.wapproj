@@ -39,6 +39,15 @@
     <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
     <EntryPointProjectUniqueName>..\OPNsenseWidgets\OPNsenseWidgets.csproj</EntryPointProjectUniqueName>
   </PropertyGroup>
+  <!-- Release: one .msixupload for Partner Center with x64 and ARM64 (Store signs it) -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <AppxBundle>Always</AppxBundle>
+    <AppxBundlePlatforms>x64|arm64</AppxBundlePlatforms>
+    <UapAppxPackageBuildMode>StoreUpload</UapAppxPackageBuildMode>
+    <AppxSymbolPackageEnabled>true</AppxSymbolPackageEnabled>
+    <GenerateAppInstallerFile>false</GenerateAppInstallerFile>
+    <GenerateTestArtifacts>false</GenerateTestArtifacts>
+  </PropertyGroup>
 
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest">

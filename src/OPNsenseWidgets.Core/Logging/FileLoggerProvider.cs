@@ -2,22 +2,58 @@ using Microsoft.Extensions.Logging;
 
 namespace OPNsenseWidgets.Logging;
 
-public sealed class FileLoggerProvider : ILoggerProvider
+/// <summary>
+/// Appends log lines to a file. When the file passes <paramref name="maxBytes"/>,
+/// it is moved to "*.old" (replacing the previous one) so the log never grows without bound.
+/// </summary>
+public sealed class FileLoggerProvider(string filePath, LogLevel minLevel = LogLevel.Debug, long maxBytes = 1_000_000)
+    : ILoggerProvider
 {
-    private readonly string _filePath;
+    private readonly FileSink _sink = new(filePath, maxBytes);
 
-    public FileLoggerProvider(string filePath) => _filePath = filePath;
-
-    public ILogger CreateLogger(string categoryName) => new FileLogger(_filePath);
+    public ILogger CreateLogger(string categoryName) => new FileLogger(_sink, minLevel);
 
     public void Dispose() { }
 
-    private sealed class FileLogger(string filePath) : ILogger
+    private sealed class FileSink
     {
-        private static readonly object FileLock = new();
+        private const int CheckEvery = 200;
+        private readonly object _lock = new();
+        private readonly string _path;
+        private readonly long _maxBytes;
+        private int _writesSinceCheck = CheckEvery; // check on the first write
 
+        public FileSink(string path, long maxBytes)
+        {
+            _path = path;
+            _maxBytes = maxBytes;
+            try { Directory.CreateDirectory(Path.GetDirectoryName(path)!); } catch { }
+        }
+
+        public void Write(string line)
+        {
+            lock (_lock)
+            {
+                try
+                {
+                    if (++_writesSinceCheck >= CheckEvery)
+                    {
+                        _writesSinceCheck = 0;
+                        var info = new FileInfo(_path);
+                        if (info.Exists && info.Length > _maxBytes)
+                            File.Move(_path, _path + ".old", overwrite: true);
+                    }
+                    File.AppendAllText(_path, line + Environment.NewLine);
+                }
+                catch { }
+            }
+        }
+    }
+
+    private sealed class FileLogger(FileSink sink, LogLevel minLevel) : ILogger
+    {
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-        public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Debug;
+        public bool IsEnabled(LogLevel logLevel) => logLevel >= minLevel && logLevel != LogLevel.None;
 
         public void Log<TState>(
             LogLevel logLevel,
@@ -28,15 +64,11 @@ public sealed class FileLoggerProvider : ILoggerProvider
         {
             if (!IsEnabled(logLevel)) return;
 
-            var line = $"{DateTime.Now:HH:mm:ss.fff} [{logLevel}] {formatter(state, exception)}";
+            var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{logLevel}] {formatter(state, exception)}";
             if (exception is not null)
                 line += Environment.NewLine + exception;
 
-            lock (FileLock)
-            {
-                try { File.AppendAllText(filePath, line + Environment.NewLine); }
-                catch { }
-            }
+            sink.Write(line);
         }
     }
 }

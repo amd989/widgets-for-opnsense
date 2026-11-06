@@ -19,9 +19,19 @@ internal class Program
 {
     private static readonly Guid ProviderClsid = Guid.Parse("D40B2E99-B044-4758-9AB5-212C01B368EE");
 
+#if DEBUG
+    // Dev builds: verbose log on the Desktop, easy to tail while testing
     private static readonly string LogPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
         "opnsense-widget-debug.log");
+    private const LogLevel FileLogLevel = LogLevel.Debug;
+#else
+    // Release builds: next to the settings, without Debug lines (those include lease bodies)
+    private static readonly string LogPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".opnsense-widgets", "opnsense-widgets.log");
+    private const LogLevel FileLogLevel = LogLevel.Information;
+#endif
 
     [DllImport("ole32.dll")]
     private static extern int CoRegisterClassObject(
@@ -41,16 +51,9 @@ internal class Program
     {
         var services = new ServiceCollection();
 
-        // Logging
+        // Logging (file only: the app is a WinExe, so there is no console to write to)
         services.AddLogging(builder =>
-        {
-            builder.AddSimpleConsole(options =>
-            {
-                options.SingleLine = true;
-                options.TimestampFormat = "HH:mm:ss.fff ";
-            });
-            builder.AddProvider(new FileLoggerProvider(LogPath));
-        });
+            builder.AddProvider(new FileLoggerProvider(LogPath, FileLogLevel)));
 
         // Configuration
         services.AddSingleton<ISettingsManager, SettingsManager>();
