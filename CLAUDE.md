@@ -1,4 +1,4 @@
-# OPNsense Widgets
+# Widgets for OPNsense
 
 Windows 11 native widget provider for monitoring an OPNsense router from the Widget Board (Win+W), plus the same widgets on KDE Plasma 6 and a GNOME Shell top bar indicator through a Linux daemon.
 

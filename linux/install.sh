@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs the OPNsense widgets for the current user:
+# Installs Widgets for OPNsense for the current user:
 #   - opnsense-widgetsd   ~/.local/lib/opnsense-widgets/, run as a systemd user service
 #   - KDE Plasma 6: three widgets (DHCP Leases, Traffic, Firewall) via kpackagetool6
 #   - GNOME Shell 46+: a top bar indicator extension (opnsense-widgets@alejandro.md)

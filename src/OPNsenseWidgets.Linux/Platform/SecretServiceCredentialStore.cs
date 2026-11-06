@@ -13,7 +13,7 @@ namespace OPNsenseWidgets.Linux.Platform;
 public sealed class SecretServiceCredentialStore : ICredentialStore
 {
     private static readonly string[] Attributes = ["service", "opnsense-widgets", "account", "api"];
-    private const string Label = "OPNsense Widgets API key";
+    private const string Label = "Widgets for OPNsense API key";
     private static readonly TimeSpan ToolTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan MissRetry = TimeSpan.FromSeconds(15);
 

@@ -17,8 +17,8 @@
                     PhonePublisherId="00000000-0000-0000-0000-000000000000" />
 
   <Properties>
-    <DisplayName>OPNsense Widgets</DisplayName>
-    <PublisherDisplayName>OPNsense Widgets</PublisherDisplayName>
+    <DisplayName>Widgets for OPNsense</DisplayName>
+    <PublisherDisplayName>Alejandro Mora</PublisherDisplayName>
     <Logo>Images\StoreLogo.png</Logo>
   </Properties>
 
@@ -36,8 +36,8 @@
       EntryPoint="Windows.FullTrustApplication">
 
       <uap:VisualElements
-        DisplayName="OPNsense Widgets"
-        Description="Monitor your OPNsense router from the Windows Widget Board"
+        DisplayName="Widgets for OPNsense"
+        Description="Monitor your OPNsense router from the Windows Widget Board. Not affiliated with Deciso B.V. or the OPNsense project."
         BackgroundColor="transparent"
         Square150x150Logo="Images\Square150x150Logo.png"
         Square44x44Logo="Images\Square44x44Logo.png">
@@ -50,7 +50,7 @@
           <com:ComServer>
             <com:ExeServer Executable="OPNsenseWidgets\OPNsenseWidgets.exe"
                            Arguments="-RegisterProcessAsComServer"
-                           DisplayName="OPNsense Widgets Provider">
+                           DisplayName="Widgets for OPNsense Provider">
               <com:Class Id="D40B2E99-B044-4758-9AB5-212C01B368EE"
                          DisplayName="OPNsenseWidgetProvider" />
             </com:ExeServer>
@@ -60,7 +60,7 @@
         <!-- Widget provider extension -->
         <uap3:Extension Category="windows.appExtension">
           <uap3:AppExtension Name="com.microsoft.windows.widgets"
-                             DisplayName="OPNsense Widgets"
+                             DisplayName="Widgets for OPNsense"
                              Id="OPNsenseWidgets"
                              PublicFolder="Public">
             <uap3:Properties>

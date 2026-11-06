@@ -1,5 +1,5 @@
 [Unit]
-Description=OPNsense widgets service (feeds the OPNsense desktop widgets)
+Description=Widgets for OPNsense service (feeds the desktop widgets)
 PartOf=graphical-session.target
 After=graphical-session.target
 

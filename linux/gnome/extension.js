@@ -1,4 +1,4 @@
-// OPNsense Widgets for GNOME Shell: a top bar indicator fed by the opnsense-widgetsd user service
+// Widgets for OPNsense, GNOME Shell: a top bar indicator fed by the opnsense-widgetsd user service
 // (the same daemon that serves the KDE Plasma widgets).
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';

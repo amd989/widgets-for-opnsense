@@ -1,8 +1,10 @@
-# OPNsense Widgets
+# Widgets for OPNsense
 
 Windows 11 Widget Board (Win+W) widgets for keeping an eye on an OPNsense router without opening its web UI. The same widgets also run on KDE Plasma 6 (see [KDE Plasma (Linux)](#kde-plasma-linux)), and on GNOME as a top bar button (see [GNOME (Linux)](#gnome-linux)).
 
 The app is a native widget provider (C#, .NET 8, Windows App SDK) packaged as an MSIX. It talks to the OPNsense REST API and shows each widget as an HTML page served from the app itself. Hosts that can't show web content get Adaptive Cards instead, with charts drawn by SkiaSharp.
+
+> OPNsense® is a registered trademark of Deciso B.V. This project is not affiliated with or endorsed by Deciso B.V. or the OPNsense project. The name is used with their permission.
 
 ## Widgets
 
@@ -70,7 +72,7 @@ Deploy the MSIX:
 2. Pick the platform (`x64` or `ARM64`).
 3. Right-click **OPNsenseWidgets.Package** > **Deploy**.
 
-The widgets then show up in the Widget Board under **OPNsense Widgets**.
+The widgets then show up in the Widget Board under **Widgets for OPNsense**.
 
 ## Setup
 
@@ -276,3 +278,5 @@ linux/
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+OPNsense® is a registered trademark of Deciso B.V. This project is not affiliated with or endorsed by Deciso B.V. or the OPNsense project. The name is used with their permission.
