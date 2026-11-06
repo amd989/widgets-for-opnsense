@@ -16,7 +16,9 @@ Setup takes a minute: enter your firewall's address and an API key from OPNsense
 
 The widgets only talk to your own firewall over its API. Nothing is sent anywhere else, there is no account, and your API key is stored in Windows Credential Manager.
 
-Widgets for OPNsense is free and open source under the MIT license. It is not affiliated with or endorsed by Deciso B.V. or the OPNsense project. OPNsense is a registered trademark of Deciso B.V., and the name is used with their permission.
+Widgets for OPNsense is free and open source under the MIT license. Source code and issue tracker: https://github.com/amd989/widgets-for-opnsense
+
+It is not affiliated with or endorsed by Deciso B.V. or the OPNsense project. OPNsense is a registered trademark of Deciso B.V., and the name is used with their permission.
 
 ## Short description
 Your OPNsense firewall's DHCP leases, traffic and firewall rules in the Windows 11 Widget Board.
@@ -42,6 +44,11 @@ bandwidth
 
 ## Copyright and trademark info
 Copyright (c) 2026 Alejandro Mora. OPNsense is a registered trademark of Deciso B.V. This app is not affiliated with or endorsed by Deciso B.V. or the OPNsense project.
+
+## Properties
+Website: https://github.com/amd989/widgets-for-opnsense
+Support contact: contact@alejandro.md (issues: https://github.com/amd989/widgets-for-opnsense/issues)
+Privacy policy URL: https://github.com/amd989/widgets-for-opnsense/blob/main/PRIVACY.md
 
 ## Images (design/logo/store/)
 Screenshots (1920x1080): Screenshot-Dark.png, Screenshot-Light.png
