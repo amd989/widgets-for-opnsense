@@ -42,7 +42,7 @@
     document.body.style.setProperty("--h", (q.get("h") || 304) + "px");
     document.getElementById("title").textContent = q.get("title") || widget;
     document.getElementById("page").src =
-      `../src/OPNsenseWidgets/Widgets/${widget}/Web/index.html?size=${q.get("size") || "medium"}`;
+      `../src/OPNsenseWidgets.Core/Widgets/${widget}/Web/index.html?size=${q.get("size") || "medium"}`;
   </script>
 </body>
 </html>
