@@ -93,8 +93,8 @@ h1 .hl { color: var(--orange); }
 .btn svg { width: 17px; height: 17px; }
 .btn-primary { background: var(--orange); color: #fff; box-shadow: 0 0 0 1px var(--orange), 0 10px 30px -10px rgba(232, 89, 12, 0.7); }
 .btn-primary:hover { background: var(--orange-2); transform: translateY(-2px); }
-.btn-ghost { border: 1px solid var(--line-2); color: var(--text-2); cursor: default; }
-.btn-ghost small { font: 600 10px/1 var(--mono); text-transform: uppercase; letter-spacing: 0.1em; color: var(--orange-2); border: 1px solid rgba(232, 89, 12, 0.5); padding: 4px 6px; border-radius: 3px; }
+.btn-ghost { border: 1px solid var(--line-2); color: var(--text-2); }
+.btn-ghost:hover { border-color: var(--text-2); color: var(--text); transform: translateY(-2px); }
 .meta { font: 400 13px/1 var(--mono); color: var(--text-3); }
 .meta i { font-style: normal; color: var(--orange); padding: 0 6px; }
 
@@ -250,6 +250,7 @@ h1 .hl { color: var(--orange); }
 .steps h3 { font-size: 30px; }
 .steps p { color: var(--text-2); max-width: 720px; margin-bottom: 12px; }
 .steps b { color: var(--text); font-weight: 600; }
+.steps p a { color: var(--orange-2); }
 .path { font: 400 0.88em var(--mono); color: var(--text); background: var(--bg-2); border: 1px solid var(--line); padding: 1px 6px; border-radius: 3px; white-space: nowrap; }
 .note { font-size: 14px; color: var(--text-3) !important; }
 .note a { color: var(--text-2); }

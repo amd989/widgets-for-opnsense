@@ -4,6 +4,8 @@ Windows 11 Widget Board (Win+W) widgets for keeping an eye on an OPNsense router
 
 The app is a native widget provider (C#, .NET 8, Windows App SDK) packaged as an MSIX. It talks to the OPNsense REST API and shows each widget as an HTML page served from the app itself. Hosts that can't show web content get Adaptive Cards instead, with charts drawn by SkiaSharp.
 
+**Install:** [Microsoft Store](https://apps.microsoft.com/detail/9PD1Z0HV5L04) (Windows 11, x64 and ARM64). Project site with a live demo: https://amd989.github.io/widgets-for-opnsense/
+
 > [OPNsense](https://opnsense.org)® is a registered trademark of Deciso B.V. This project is not affiliated with or endorsed by Deciso B.V. or the OPNsense project. The name is used with their permission.
 
 ## Widgets
