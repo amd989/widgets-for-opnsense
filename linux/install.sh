@@ -8,6 +8,10 @@
 # Usage: ./install.sh [path/to/opnsense-widgetsd]
 #   The daemon binary defaults to ./opnsense-widgetsd next to this script. Build it with:
 #   dotnet publish src/OPNsenseWidgets.Linux -c Release -r linux-x64 -o linux/dist
+#
+# The deb and rpm packages (packages.alejandro.md) install the same parts system wide instead;
+# remove this per-user install with uninstall.sh before switching to them, since files under
+# ~/.local and ~/.config take precedence over the packaged ones.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -16,13 +20,6 @@ lib_dir=$HOME/.local/lib/opnsense-widgets
 unit_dir=${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user
 gnome_uuid=opnsense-widgets@alejandro.md
 gnome_dir=${XDG_DATA_HOME:-$HOME/.local/share}/gnome-shell/extensions/$gnome_uuid
-
-# id|definition|name|description|icon
-widgets=(
-  "md.alejandro.opnsensewidgets.dhcp|DhcpLeases_Widget|OPNsense DHCP Leases|Devices with DHCP leases on your OPNsense router, newest first|network-server"
-  "md.alejandro.opnsensewidgets.traffic|Traffic_Widget|OPNsense Traffic|Live download and upload throughput of your OPNsense router|office-chart-area"
-  "md.alejandro.opnsensewidgets.firewall|Firewall_Widget|OPNsense Firewall|Busiest firewall rules on your OPNsense router|security-high"
-)
 
 [[ -f "$daemon" ]] || { echo "Daemon binary not found: $daemon" >&2; exit 1; }
 
@@ -54,20 +51,8 @@ install_plasma() {
   stage=$(mktemp -d)
   trap 'rm -rf "$stage"' EXIT
 
-  for widget in "${widgets[@]}"; do
-    IFS='|' read -r id definition name description icon <<<"$widget"
+  bash "$here/plasmoids.sh" "$stage" | while IFS='|' read -r id name; do
     pkg=$stage/$id
-    cp -r "$here/plasmoid" "$pkg"
-    for file in "$pkg/metadata.json" "$pkg/contents/ui/main.qml"; do
-      sed -i \
-        -e "s|@PLUGIN_ID@|$id|g" \
-        -e "s|@DEFINITION@|$definition|g" \
-        -e "s|@NAME@|$name|g" \
-        -e "s|@DESCRIPTION@|$description|g" \
-        -e "s|@ICON@|$icon|g" \
-        "$file"
-    done
-
     if kpackagetool6 --type Plasma/Applet --show "$id" >/dev/null 2>&1; then
       kpackagetool6 --type Plasma/Applet --upgrade "$pkg" >/dev/null
       echo "Updated widget: $name"

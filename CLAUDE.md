@@ -20,7 +20,7 @@ Widget logic lives in `OPNsenseWidgets.Core` (`WidgetController`): view selectio
 3. Add fallback card templates under `Widgets/<Name>/Templates/`
 4. Add `<Definition>` entry in `Package.appxmanifest` with `WebRequestFilter="https://opnsense-widget.test/*"`
 5. Register in DI in both `Program.cs` files (Windows and Linux)
-6. Add it to the `widgets` list in `linux/install.sh`
+6. Add it to the `widgets` list in `linux/plasmoids.sh` (shared by `install.sh` and the packages)
 7. GNOME: add it to `DEFINITIONS` in `linux/gnome/daemon.js` and a menu section in `linux/gnome/indicator.js`
 8. Re-render picker screenshots with `design/capture-gallery.ps1`
 
@@ -75,7 +75,10 @@ linux/
     indicator.js                # PanelMenu.Button: panel label, St menu sections, new-device notifications
     prefs.js                    # Adw preferences: connection (daemon settings actions), top bar options
   systemd/                      # opnsense-widgetsd user unit
-  install.sh, uninstall.sh
+  packaging/                    # deb + rpm from one staged tree (stage.sh, build-deb.sh, build-rpm.sh, rpm/*.spec)
+  plasmoids.sh                  # Stamps the three plasmoids from plasmoid/ (the widget list)
+  install.sh, uninstall.sh      # Per-user install from source (~/.local)
+.github/workflows/release.yml   # v* tag: build packages, GitHub Release, dispatch to amd989/packages
 ```
 
 ## Build & Deploy
@@ -87,6 +90,15 @@ dotnet build src/OPNsenseWidgets/OPNsenseWidgets.csproj
 Deploy via Visual Studio: right-click `OPNsenseWidgets.Package` > Deploy. Requires Developer Mode enabled on Windows.
 
 Linux (KDE Plasma 6, GNOME 46+): `dotnet publish src/OPNsenseWidgets.Linux -c Release -r linux-x64 -o linux/dist`, copy `linux/` to the machine, run `linux/install.sh linux/dist/opnsense-widgetsd` (installs the Plasma widgets and/or the GNOME extension, whichever desktop is present). Log: `journalctl --user -u opnsense-widgetsd`. QML changes to widgets already on screen need `systemctl --user restart plasma-plasmashell`.
+
+## Linux Packages
+
+- **Published by amd989/packages** (packages.alejandro.md): pushing a `v*` tag runs `release.yml`, which builds, attaches the files to the GitHub Release and dispatches `{repo, tag}`. `projects/opnsense-widgets.json` over there is the allowlist. Needs the `PACKAGES_DISPATCH_TOKEN` secret here.
+- **One deb and one rpm per arch** (amd64/x86_64, arm64/aarch64); the deb has no `+bookworm` suffix, so it serves every suite and Ubuntu. Depends lists ICU (`libicu70` to `libicu78`) and OpenSSL alternatives because the self-contained daemon loads them at run time. The rpm is built on rockylinux:9.
+- **System paths**: `/usr/lib/opnsense-widgets/`, `/usr/lib/systemd/user/`, `/usr/share/plasma/plasmoids/`, `/usr/share/gnome-shell/extensions/`, schema in `/usr/share/glib-2.0/schemas/` (compiled by the distro trigger). Files under `~/.local`/`~/.config` from `install.sh` override them.
+- **Service**: `systemctl --global enable` on first install; upgrades daemon-reload and try-restart in each running user manager through `user-managers` (`systemctl --user -M <user>@`). It never runs as root.
+- **Never strip the daemon**: it is a .NET single-file bundle (`__os_install_post` is off in the spec).
+- Local test: publish in `mcr.microsoft.com/dotnet/sdk:8.0`, run `stage.sh` + `build-deb.sh` in `debian:bookworm` and `build-rpm.sh` in `rockylinux:9`, then install in a distro container.
 
 ## KDE Plasma (Linux)
 

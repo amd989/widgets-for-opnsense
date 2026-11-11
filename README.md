@@ -124,13 +124,33 @@ Settings and credentials live outside the MSIX package, so they survive reinstal
 
 `dhcpBackend` is not used yet. The backend is always auto-detected.
 
+## Linux packages
+
+On Debian, Ubuntu, Fedora and EL9-based distributions (x86_64 and arm64), install from [packages.alejandro.md](https://packages.alejandro.md):
+
+```bash
+curl -fsSL https://packages.alejandro.md/setup.sh | sudo sh
+```
+
+```bash
+sudo apt install opnsense-widgets
+```
+
+```bash
+sudo dnf install opnsense-widgets
+```
+
+The package installs the service, the KDE Plasma widgets and the GNOME Shell extension system wide, and enables the service for every user's graphical session. Log out and in again (or run `systemctl --user start opnsense-widgetsd`), then add the Plasma widgets or enable the extension in the Extensions app. Upgrades restart the service in running sessions.
+
+If you used `linux/install.sh` before, run `./linux/uninstall.sh` first: the copies it put under `~/.local` and `~/.config` take precedence over the packaged ones. The `.deb` and `.rpm` files are also attached to each [GitHub Release](https://github.com/amd989/widgets-for-opnsense/releases).
+
 ## KDE Plasma (Linux)
 
 The same three widgets run on KDE Plasma 6. A small user service, `opnsense-widgetsd`, does what the Windows provider does: it polls OPNsense and serves the widget pages on `127.0.0.1:47820`. Each Plasma widget shows its page in an embedded browser.
 
 Requirements: Plasma 6, Qt WebEngine for QML (Fedora: `qt6-qtwebengine`), and `secret-tool` (Fedora: `libsecret`) to keep the API key in KWallet or GNOME Keyring.
 
-Build the daemon (from Windows or Linux, any machine with the .NET 8 SDK), then copy the `linux/` folder to the Linux machine and run the installer there:
+To install from source instead of the [packages](#linux-packages), build the daemon (from Windows or Linux, any machine with the .NET 8 SDK), then copy the `linux/` folder to the Linux machine and run the installer there:
 
 ```bash
 dotnet publish src/OPNsenseWidgets.Linux -c Release -r linux-x64 -o linux/dist
@@ -230,7 +250,7 @@ Other tips:
 2. Add the page under `Widgets/<Name>/Web/index.html`, using `../../Shared/Web/widget.css` and `widget.js` (files under `Web/` are embedded automatically). Add `SmallTemplate.json`, `MediumTemplate.json` and `LargeTemplate.json` (the fallback cards) under `Widgets/<Name>/Templates/`.
 3. Add a `<Definition>` entry in `src/OPNsenseWidgets.Package/Package.appxmanifest` with `WebRequestFilter="https://opnsense-widget.test/*"`, so the board asks the app for the page.
 4. Register it in both `Program.cs` files (Windows and Linux): `services.AddSingleton<IWidgetDefinition, <Name>Widget>();`
-5. Add a line to the `widgets` list in `linux/install.sh` for the Plasma widget.
+5. Add a line to the `widgets` list in `linux/plasmoids.sh` for the Plasma widget (used by `install.sh` and the packages).
 6. For GNOME, add it to `DEFINITIONS` in `linux/gnome/daemon.js` and give it a section in `linux/gnome/indicator.js` (GNOME draws the menu natively from the same payload).
 7. Re-render the widget picker screenshots with `design/capture-gallery.ps1` (serve the repo root on port 8766 first).
 
@@ -261,10 +281,12 @@ src/
     Package.appxmanifest        COM server and widget definitions
   OPNsenseWidgets.Linux/        opnsense-widgetsd: Kestrel on 127.0.0.1, pages + WebSocket (PageHost)
 linux/
-  plasmoid/                     Plasma 6 widget template (install.sh stamps one per widget)
+  plasmoid/                     Plasma 6 widget template (plasmoids.sh stamps one per widget)
   gnome/                        GNOME Shell extension: top bar indicator, preferences, schema
   systemd/                      User service for opnsense-widgetsd
-  install.sh, uninstall.sh
+  packaging/                    deb and rpm: stage.sh lays out the system-wide tree, build-deb.sh, rpm spec
+  install.sh, uninstall.sh      Per-user install from source
+.github/workflows/release.yml   On a v* tag: build the packages, attach them to the release, publish
 ```
 
 ## Tech stack

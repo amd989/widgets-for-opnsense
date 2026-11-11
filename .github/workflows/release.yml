@@ -1,0 +1,117 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  # One deb and one rpm per architecture. The daemon is cross-published (self-contained, single
+  # file) on the x64 runner, so nothing runs under emulation. The deb carries no
+  # +bookworm/+trixie suffix, so the same file serves every Debian and Ubuntu release.
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - rid: linux-x64
+            deb_arch: amd64
+            rpm_arch: x86_64
+          - rid: linux-arm64
+            deb_arch: arm64
+            rpm_arch: aarch64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish opnsense-widgetsd
+        run: |
+          dotnet publish src/OPNsenseWidgets.Linux -c Release -r ${{ matrix.rid }} \
+            -o publish -p:DebugType=none -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Stage install tree
+        run: bash linux/packaging/stage.sh publish/opnsense-widgetsd root
+
+      - name: Build .deb package
+        run: |
+          docker run --rm -v "$PWD":/build -w /build debian:bookworm \
+            bash linux/packaging/build-deb.sh "${{ steps.version.outputs.version }}" ${{ matrix.deb_arch }} root output
+
+      # Built on EL9 so older rpm versions can read and verify it.
+      - name: Build .rpm package
+        run: |
+          docker run --rm -v "$PWD":/build -w /build rockylinux:9 bash -c '
+            set -e
+            dnf install -y -q rpm-build
+            bash linux/packaging/build-rpm.sh "${{ steps.version.outputs.version }}" ${{ matrix.rpm_arch }} root output
+          '
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.deb_arch }}
+          path: |
+            output/*.deb
+            output/*.rpm
+
+  release:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: packages
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            packages/*.deb
+            packages/*.rpm
+          generate_release_notes: true
+
+  # Packages are published centrally by amd989/packages, which serves
+  # packages.alejandro.md. This repository builds, attaches the artifacts to
+  # its own GitHub Release, and asks the publisher to pick that release up.
+  # The signing key and the storage credentials live only over there.
+  publish:
+    needs: [release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish to packages.alejandro.md
+        env:
+          GH_TOKEN: ${{ secrets.PACKAGES_DISPATCH_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::PACKAGES_DISPATCH_TOKEN is not set. The release exists, but packages.alejandro.md was not asked to publish it. Set the secret, then run the publish workflow in amd989/packages by hand for $REPO $TAG."
+            exit 1
+          fi
+          # -f rather than -F: -F converts values that look like numbers or
+          # booleans, and the publisher expects the tag as a string.
+          gh api repos/amd989/packages/dispatches \
+            -f event_type=publish \
+            -f "client_payload[repo]=$REPO" \
+            -f "client_payload[tag]=$TAG"
+          {
+            echo "### Asked packages.alejandro.md to publish \`$REPO\` \`$TAG\`"
+            echo
+            echo "Follow it at https://github.com/amd989/packages/actions/workflows/publish.yaml"
+          } >> "$GITHUB_STEP_SUMMARY"

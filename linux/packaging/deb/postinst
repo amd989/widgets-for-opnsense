@@ -1,0 +1,17 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "configure" ]; then
+    if [ -z "$2" ]; then
+        # First install: start the user service in every graphical session from now on.
+        systemctl --global enable opnsense-widgetsd.service >/dev/null 2>&1 || true
+        echo "opnsense-widgets: log out and in again (or run: systemctl --user start opnsense-widgetsd),"
+        echo "  then add the KDE widgets or enable the GNOME extension (Extensions app)."
+    else
+        # Upgrade: sessions running the service pick up the new daemon now.
+        /usr/lib/opnsense-widgets/user-managers daemon-reload
+        /usr/lib/opnsense-widgets/user-managers try-restart opnsense-widgetsd.service
+    fi
+fi
+
+exit 0

@@ -1,0 +1,13 @@
+#!/bin/sh
+# Runs "systemctl --user <args>" in every running user manager, as that user, so the package
+# scripts can reload and restart opnsense-widgetsd for people who are logged in. The daemon
+# itself never runs as root. Failures are ignored: a user may not run the service at all.
+#
+# Usage: user-managers daemon-reload
+#        user-managers try-restart opnsense-widgetsd.service
+for dir in /run/user/[0-9]*; do
+    [ -S "$dir/systemd/private" ] || continue
+    user=$(id -nu "${dir##*/}" 2>/dev/null) || continue
+    systemctl --user -M "$user@" "$@" >/dev/null 2>&1 || true
+done
+exit 0

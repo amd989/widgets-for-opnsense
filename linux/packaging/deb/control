@@ -1,0 +1,17 @@
+Package: opnsense-widgets
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: Alejandro Mora <mail@alejandro.md>
+Installed-Size: @SIZE@
+Section: net
+Priority: optional
+Homepage: https://github.com/amd989/widgets-for-opnsense
+Depends: libc6 (>= 2.27), libgcc-s1, libstdc++6, zlib1g, libssl3t64 | libssl3 | libssl1.1, libicu78 | libicu77 | libicu76 | libicu75 | libicu74 | libicu73 | libicu72 | libicu71 | libicu70
+Recommends: qml6-module-qtwebengine, libsecret-tools, alejandro-md-keyring
+Description: Widgets for OPNsense on KDE Plasma and GNOME
+ Shows devices with DHCP leases, live traffic and firewall activity of an
+ OPNsense router on the Linux desktop: three KDE Plasma 6 widgets and a
+ GNOME Shell 46+ top bar indicator with new-device notifications. A small
+ user service, opnsense-widgetsd, talks to the router API and feeds both.
+ .
+ Not affiliated with Deciso B.V. or the OPNsense project.
