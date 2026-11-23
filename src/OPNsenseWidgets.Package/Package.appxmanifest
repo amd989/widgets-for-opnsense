@@ -11,7 +11,7 @@
   <Identity
     Name="AlejandroMoraDaz.WidgetsforOPNsense"
     Publisher="CN=A312A118-8FCC-4887-ABFD-917260D9441A"
-    Version="1.0.0.0" />
+    Version="1.0.1.0" />
 
   <mp:PhoneIdentity PhoneProductId="d40b2e99-b044-4758-9ab5-212c01b368ee"
                     PhonePublisherId="00000000-0000-0000-0000-000000000000" />
