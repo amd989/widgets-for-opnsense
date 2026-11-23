@@ -58,6 +58,11 @@
   .btn[hidden] { display: none; }
   .btn.busy::after { content: ""; display: inline-block; width: 9px; height: 9px; margin-left: 6px; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: -1px; }
 
+  /* The board's Customize dialog draws no backdrop behind the page (the widget itself does),
+     so give it the dialog's own color there. */
+  html.in-dialog { background: #2b2b2b; }
+  @media (prefers-color-scheme: light) { html.in-dialog { background: #f9f9f9; } }
+
   /* Small is too short for the form. */
   .form { display: contents; }
   .too-small { display: none; }
@@ -71,7 +76,7 @@
       <div class="heading">Connection<small>OPNsense API key with read access</small></div>
       <div class="fields">
         <div class="field"><label for="hostUrl">URL</label><input id="hostUrl" type="text" placeholder="https://192.168.1.1" spellcheck="false" autocomplete="off"></div>
-        <div class="field"><label for="apiKey">Key</label><input id="apiKey" type="text" placeholder="API key" spellcheck="false" autocomplete="off"></div>
+        <div class="field"><label for="apiKey">Key</label><input id="apiKey" type="password" placeholder="API key" spellcheck="false" autocomplete="off"></div>
         <div class="field"><label for="apiSecret">Secret</label><input id="apiSecret" type="password" placeholder="API secret" autocomplete="off"></div>
       </div>
       <div class="row">
@@ -137,6 +142,7 @@
       // In the board's Customize dialog only its own close button can end it, so Cancel would just
       // swap the dialog to the widget view. Hide it there.
       $("cancel").hidden = !!p.inDialog;
+      document.documentElement.classList.toggle("in-dialog", !!p.inDialog);
 
       const result = $("result");
       result.textContent = p.testResult || "";
